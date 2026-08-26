@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  If you use KAUT, or build on the concepts it implements —
+  source-bound, freshness-checked project knowledge with git-anchored
+  verdicts and a gated agent write path — please cite it as below.
+title: "KAUT — Knowledge Actualization Under Trust"
+type: software
+authors:
+  - given-names: Yuriy
+    family-names: Orlov
+    email: yuriy.orlov@undertrust.dev
+abstract: >-
+  KAUT is a knowledge layer for AI agents working on real codebases:
+  self-maintaining, AI-first project documentation. Every stored fact
+  is bound to its sources and anchored to a git commit; freshness
+  verdicts are computed at read time (never stored), trust labels
+  grade how much a fact deserves belief, and an altitude band tells
+  the reader whether a doc matches the granularity of the question.
+  Writes pass through a layered owner/agent gate with a draft queue
+  for asynchronous review, and tamper containment withholds anything
+  edited outside the pipeline. Ships as a zero-dependency Node.js CLI
+  plus an MCP (Model Context Protocol) server.
+keywords:
+  - ai-agents
+  - knowledge-base
+  - documentation
+  - freshness
+  - provenance
+  - trust
+  - mcp
+  - model-context-protocol
+  - llm
+  - developer-tools
+license: Apache-2.0
+version: 0.4.0
+date-released: "2026-08-26"

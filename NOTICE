@@ -1,0 +1,20 @@
+KAUT — Knowledge Actualization Under Trust
+Copyright 2026 Yuriy Orlov <yuriy.orlov@undertrust.dev>
+
+This product includes software originally developed and first published
+by Yuriy Orlov in August 2026.
+
+KAUT implements AI-first project knowledge as source-bound,
+freshness-checked, trust-labeled documentation: every stored fact is
+anchored to the git commit it was derived at and carries a freshness
+verdict computed at read time, writes pass through a layered owner/agent
+write gate with a draft queue for asynchronous review, and content
+edited outside the pipeline is withheld by tamper containment. This
+design and its terminology were conceived and first published by
+Yuriy Orlov.
+
+This NOTICE file is provided pursuant to the Apache License, Version 2.0
+(the "License"). Redistributions of this software, in source or binary
+form, with or without modification, must retain readable copies of the
+attribution notices contained in this file, in accordance with
+Section 4(d) of the License.

@@ -1,0 +1,41 @@
+{
+    "name": "kaut",
+    "version": "0.4.0",
+    "description": "KAUT (Knowledge Actualization Under Trust) — self-maintaining, source-bound, freshness-checked project knowledge for AI agents",
+    "license": "Apache-2.0",
+    "author": "Yuriy Orlov <yuriy.orlov@undertrust.dev> (https://github.com/yurgeno)",
+    "private": true,
+    "keywords": [
+        "ai-agents",
+        "knowledge-base",
+        "freshness",
+        "documentation",
+        "mcp",
+        "model-context-protocol",
+        "llm",
+        "developer-tools"
+    ],
+    "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
+    "bin": {
+        "kaut": "./kaut.mjs"
+    },
+    "files": [
+        "kaut.mjs",
+        "mcp.mjs",
+        "lib/",
+        "docs/",
+        "README.md",
+        "SCHEMA.md",
+        "CHANGELOG.md",
+        "LICENSE",
+        "NOTICE",
+        "CITATION.cff",
+        "VERSION"
+    ],
+    "scripts": {
+        "test": "node --test"
+    }
+}
