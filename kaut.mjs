@@ -25,7 +25,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeF
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CONFIG_NAME, deriveProjectId, discover, EnvironmentError, kautHome, resolveFreshnessRepo, storeConfigPath, tryGit } from './lib/discover.mjs'
+import { CONFIG_NAME, deriveProjectId, discover, EnvironmentError, kautAnchor, kautHome, resolveFreshnessRepo, storeConfigPath, tryGit } from './lib/discover.mjs'
 import { commitAll, ensureStoreGit, storeGit, uncommittedPaths } from './lib/gitstore.mjs'
 import { enforceGrants } from './lib/grants.mjs'
 import { generateIndex, LAYER_DIRS, scanStore, typeForId, validateDoc, writeIndex } from './lib/indexgen.mjs'
@@ -1170,7 +1170,36 @@ function storeConfig(root) {
 }
 
 const USAGE =
-    'usage: kaut.mjs <bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--dry-run] [--json] [--quiet]'
+    'usage: kaut.mjs <bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--dry-run] [--json] [--quiet]'
+
+/**
+ * `kaut home [<dir>]` — show or set the knowledge-data home. This is the engine's own
+ * install step: the redirect persists at `<anchor>/config.json`, so every later caller
+ * (CLI or MCP) resolves the data location itself — no env to pass, no orchestrator
+ * involvement. Env `KAUT_HOME` still outranks the redirect for one-off overrides.
+ * @param {{log: (s: string) => void}} opts
+ * @param {string|undefined} dir
+ */
+function cmdHome({ log }, dir) {
+    const cfgPath = path.join(kautAnchor(), 'config.json')
+    if (!dir) {
+        const source = process.env.KAUT_HOME ? 'env KAUT_HOME' : existsSync(cfgPath) ? `redirect ${cfgPath}` : 'default'
+        log(`${kautHome()} (${source})`)
+        return
+    }
+    const root = path.resolve(dir)
+    mkdirSync(root, { recursive: true }) // instance data folder — create, never delete
+    mkdirSync(kautAnchor(), { recursive: true })
+    let cfg = {}
+    try {
+        cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
+    } catch {
+        cfg = {}
+    }
+    cfg.dataRoot = root
+    writeFileSync(cfgPath, JSON.stringify(cfg, null, 4) + '\n')
+    log(`knowledge-data home set: ${root} (redirect: ${cfgPath})`)
+}
 
 async function main() {
     const { values, positionals } = parseArgs({
@@ -1205,7 +1234,7 @@ async function main() {
     // Some commands resolve stores from the registry, not cwd, so a non-store cwd is fine for them:
     // workspace-wide doctor/stale (--workspace) and `digest` (always registry-driven). Single-store
     // behavior is unchanged for every other command.
-    const cwdOptional = cmd === 'digest' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
+    const cwdOptional = cmd === 'digest' || cmd === 'home' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
     let d = null
     try {
         d = discover()
@@ -1260,6 +1289,9 @@ async function main() {
             break
         case 'workspace':
             await cmdWorkspace(opts, rest, values.manifest)
+            break
+        case 'home':
+            cmdHome(opts, rest[0])
             break
         case 'paths':
             console.log(JSON.stringify(d, null, 2))

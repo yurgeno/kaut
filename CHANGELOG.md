@@ -4,6 +4,7 @@
 
 **First public release.**
 
+- `kaut home <dir>`: a persistent knowledge-data home redirect (`~/.kaut/config.json`) — the engine owns its data location; callers pass nothing.
 - `lookup` one-call read surface with freshness verdicts (merge-base-anchored, err-toward-stale;
   `healthy`/`stale`/`broken`/`disputed`/`branch-advisory`), trust tiers (T0–T4), and the
   `altitude` coverage band (`landscape`/`component`/`endpoint`; landscape docs emit a

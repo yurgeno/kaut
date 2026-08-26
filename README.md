@@ -88,6 +88,19 @@ path works — the engine is invoked as `node <engine>/kaut.mjs` and resolves ev
 itself (an orchestration framework consuming KAUT, e.g. TAUT, records the engine location in
 its own configuration). There is no `npm install` step — the engine has zero dependencies.
 
+Optional install step — choose where knowledge lives (stores + workspace registry).
+Default is `~/.kaut`; to keep the data in a dedicated folder (backups, visibility, its own
+lifecycle) record a redirect once:
+
+```bash
+node <engine>/kaut.mjs home ~/kaut-data
+```
+
+The redirect persists at `~/.kaut/config.json`, so every later caller — CLI or the MCP
+server — resolves the data location by itself; nothing to export, nothing for an
+orchestrator to pass. `kaut home` (no argument) shows the current home and where it came
+from; the `KAUT_HOME` env var still outranks the redirect for one-off overrides.
+
 From your project directory run
 
 ```bash
@@ -134,6 +147,7 @@ Run from anywhere inside a project git repository:
 node <engine>/kaut.mjs bootstrap     # create/repair the project's knowledge store (idempotent)
 node <engine>/kaut.mjs index         # regenerate INDEX.md (under lock; auto-commits changes)
 node <engine>/kaut.mjs doctor        # integrity checks; exit 0 = healthy
+node <engine>/kaut.mjs home [<dir>]  # show or set the knowledge-data home (redirect at ~/.kaut/config.json)
 node <engine>/kaut.mjs paths         # print resolved {projectId, root, engine, repo, mainBranch, source}
 # reading core:
 node <engine>/kaut.mjs lookup [<id>] # one-call ready block; no id = catalog; unknown id = miss (exit 0)

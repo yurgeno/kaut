@@ -19,8 +19,11 @@ why, [HANDBOOK.md](HANDBOOK.md); for the normative data contract, [SCHEMA.md](..
 - **Workspace**: registries in `~/.kaut/workspaces/` (SCHEMA §21); a SYSTEM store
   may anchor its freshness to a different repo via config `project.anchorRepo` (SCHEMA §18);
   `repo:<name>:file:<path>` sources are existence-only cross-repo bindings (SCHEMA §17).
-  `KAUT_HOME` relocates the whole `~/.kaut` base (tests use it);
-  `KAUT_WORKSPACES_DIR` overrides just the registry directory.
+  The data home resolves as: `KAUT_HOME` env → the `dataRoot` redirect in
+  `~/.kaut/config.json` (written by `kaut home <dir>` — the engine's own install step) →
+  `~/.kaut` itself. `KAUT_WORKSPACES_DIR` overrides just the registry directory. The engine
+  checkout stays anchored at `~/.kaut/engine` (or wherever the caller invokes it) — only
+  the DATA follows the redirect.
 - **Journal**: `<store>/journal.jsonl` is append-only untracked telemetry and grows without
   bound; it is safe to truncate old lines manually (it is never knowledge, and `digest`
   simply sees a shorter history).

@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { commitAll, ensureStoreGit, uncommittedPaths } from '../lib/gitstore.mjs'
@@ -169,4 +169,25 @@ test('map: a missing default routes file skips routemap, the other collectors st
     assert.equal(r.code, 0, r.stdout)
     assert.match(r.stdout, /routemap skipped/)
     assert.match(r.stdout, /packages/)
+})
+
+// ---------- the data-home redirect (`kaut home`) ----------
+
+test('home: the redirect is the engine-owned install step — stores follow it with no env', () => {
+    const fakeHome = makeTmpDir() // isolated $HOME so the real anchor is never touched
+    const dataDir = path.join(makeTmpDir(), 'knowledge')
+    const repo = makeGitRepo()
+    const env = { ...process.env, HOME: fakeHome }
+    delete env.KAUT_HOME
+    delete env.KAUT_ROOT
+    const cli = (args, extra = {}) => execFileSync('node', [KAUT, ...args], { cwd: repo, encoding: 'utf8', env: { ...env, ...extra } })
+    assert.match(cli(['home', dataDir]), /knowledge-data home set/)
+    const shown = cli(['home'])
+    assert.ok(shown.includes(dataDir) && /redirect/.test(shown), shown)
+    // a plain bootstrap (no env, no pointer yet) derives the store under the redirect
+    cli(['bootstrap'])
+    const stores = readdirSync(dataDir).filter((n) => n.includes('--'))
+    assert.equal(stores.length, 1, `store derived under the redirect: ${stores}`)
+    // env KAUT_HOME still outranks the redirect (one-off overrides, tests)
+    assert.match(cli(['home'], { KAUT_HOME: '/tmp/elsewhere' }), /elsewhere.*env KAUT_HOME/)
 })
