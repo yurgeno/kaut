@@ -172,9 +172,26 @@ Note: the default `map` globs are Vue/monorepo-conventional (`src/router/routes.
 `map.routesFile`/`map.packagesDir` at your stack's files in the store config, trim
 `map.collectors`, or skip `map` entirely.
 
-Then: **work as usual.** That is the entire setup. The agent looks things up on its own
-(`kaut lookup` from the CLI, or the `kaut_*` tools over MCP — `node <engine>/mcp.mjs`); if
-you ever want to browse, `node <engine>/kaut.mjs lookup` prints the catalog of topics.
+## Wiring your agents — the step that makes it real
+
+A store alone changes nothing: **your agent has to know it exists and when to consult it.**
+Two moves (full guide with paste-ready blocks and a worked session:
+[docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md)):
+
+1. **Connect the MCP server** to your harness (`.mcp.json` for Claude Code, `config.toml`
+   for Codex — snippets in the guide). The seven `kaut_*` tools appear in every session,
+   and their descriptions already teach the model the discipline: look up before
+   re-exploring, route trust by the verdict, write back through the gate.
+2. **Paste the knowledge contract** into whatever your agent loads every session
+   (`CLAUDE.md` / `AGENTS.md` / system prompt) — a ~15-line block from the guide that
+   makes the behavior reliable rather than occasional: *read before re-deriving; healthy +
+   precise = use as-is, stale/coarse = confirm in code; tag outcomes with `kaut_note`;
+   after editing files run `kaut_touched` and repair or queue what the change owes.*
+
+Optionally wrap the contract as a harness skill (template in the guide), or let an
+orchestration framework compile the wiring for you — [TAUT](https://github.com/yurgeno/taut)
+does it from one setup answer. Then: **work as usual.** If you ever want to browse
+yourself, `node <engine>/kaut.mjs lookup` prints the catalog of topics.
 
 ## Daily use — there is none
 
@@ -324,6 +341,8 @@ near-nothing: freshness checks are pure git comparisons — no AI calls involved
 - [docs/HANDBOOK.md](docs/HANDBOOK.md) — how it all works, in human language but in full detail
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — operator reference: on-disk layout, resolution,
   tamper containment, write gate, engine internals
+- [docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md) — wiring agents to the store: the
+  knowledge contract, per-harness snippets, a skill template, a worked session
 - [docs/MCP.md](docs/MCP.md) — the MCP server reference: registration, all 7 tools, protocol
 - [SCHEMA.md](SCHEMA.md) — the normative data contract this engine implements
 - [CHANGELOG.md](CHANGELOG.md) — release history
