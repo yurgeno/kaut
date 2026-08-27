@@ -23,15 +23,16 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.7.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.8.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
 launcher repo. Writing: the layered write gate (agent-tier updates land directly; owner-gated
 layers and novel docs queue as **drafts** for asynchronous review). Maintenance: `refresh`
 (re-derivation delta bundles), `touched` (change-site sensor), `digest`/`note` (usage and
-outcome telemetry). Any MCP-capable harness plugs in via the bundled MCP server. What is
-live in detail: [docs/HANDBOOK.md §16](docs/HANDBOOK.md#16-status--roadmap).
+outcome telemetry). Interop: stores meet the OKF v0.2 conformance bar and `kaut okf export`
+produces idiomatic OKF bundles. Any MCP-capable harness plugs in via the bundled MCP server.
+What is live in detail: [docs/HANDBOOK.md §16](docs/HANDBOOK.md#16-status--roadmap).
 
 ---
 
