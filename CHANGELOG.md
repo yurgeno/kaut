@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-08-27
+
+- Stack adapters + auto-detection: bootstrap now detects the repo's stack and seeds
+  `map.collectors` (existing configs untouched). New collectors: `springmap`
+  (Java/Kotlin Spring route table, nested build roots supported), `jvmgraph`
+  (Gradle/Maven module graph incl. single-module builds), `nextroutes` (Next.js
+  App+Pages file routing), `httproutes` (Express/Nest/FastAPI/Flask lexical routes),
+  `phproutes` (Laravel/Symfony routes), `sqlmigrations` (Flyway-style inventory).
+  Every collector skips gracefully when its stack marker is absent.
+- Docs: the supported-stacks table and the explicit platform statement (developed and
+  tested on macOS and Linux; Windows not supported).
+
 ## 0.6.0 — 2026-08-27
 
 - `kaut backup` / `kaut restore`: the whole data home (stores with their git history, the

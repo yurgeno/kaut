@@ -13,7 +13,8 @@
 > does, how it is structured, and why. It turns what agents learn while working into living
 > documentation — so no session starts from zero.
 
-Zero-dependency Node.js (≥ 20, developed on 24), macOS/Linux, Apache-2.0.
+Zero-dependency Node.js (≥ 20, developed on 24), Apache-2.0. **Developed and tested on
+macOS and Linux** (CI runs Linux, Node 20 and 24); Windows is not supported.
 
 **A complete, standalone product.** One `git clone` is the whole install; point your harness
 at the bundled MCP server (or call the CLI from any skill/prompt) and it works — no
@@ -21,7 +22,7 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.6.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.7.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
@@ -170,9 +171,31 @@ server to your harness, and paste the knowledge contract into your agent instruc
 node kaut/kaut.mjs map
 ```
 
-(the default `map` globs are Vue/monorepo-conventional; on other stacks the route
-collector skips itself with a note and the rest still run — point
-`map.routesFile`/`map.packagesDir` at your stack's files, or skip `map` entirely).
+(bootstrap already detected your stack and seeded the right collectors — see
+**Supported stacks** below; a collector whose input is absent skips itself with a note,
+and `map.collectors: []` means the map layer simply stays empty).
+
+## Supported stacks
+
+Bootstrap, the knowledge loop, freshness verdicts, the write gate — all of it is
+**stack-agnostic**: any git repository works. Only the mechanical `map/` layer is
+stack-specific, and bootstrap **auto-detects** the stack and seeds `map.collectors`
+accordingly (existing configs are never touched; every knob stays overridable):
+
+| Stack | Detected by | Map output |
+|---|---|---|
+| Vue (incl. monorepo) | `vue` dep / `src/router/routes.ts` | route table + package import graph |
+| Java / Kotlin + Spring | Gradle/Maven build root (top or nested one level) + controller annotations | `@RequestMapping`-family route table + module graph |
+| Next.js | `next` dep / `app`·`pages` trees | file-based route table (App + Pages router) |
+| Express / Nest / FastAPI / Flask | deps in package.json / requirements / pyproject | lexical METHOD-path route table |
+| PHP (Laravel / Symfony) | `composer.json` | `Route::…` / `#[Route]` route table |
+| SQL migrations (Flyway-style) | `V*__*.sql` files | migration inventory (count, versions) |
+| docker-compose landscape | `docker-compose.yml` | service map |
+
+A repo with no recognizable stack gets an empty map layer and everything else works the
+same. The lexical collectors are honest best-effort scans, marked as such in the generated
+doc. Adapters for further stacks are deliberately small modules — see
+[CONTRIBUTING.md](CONTRIBUTING.md) if yours is missing.
 
 ## Wiring your agents — the step that makes it real
 
@@ -302,7 +325,7 @@ nothing.
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 170 tests, zero deps (node:test)
+cd <engine> && node --test          # 204 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24

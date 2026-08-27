@@ -46,6 +46,13 @@ import { aggregate, renderDigest } from './lib/digest.mjs'
 import { buildRouteMap, RouteMapError } from './lib/routemap.mjs'
 import { buildPackageGraph } from './lib/pkggraph.mjs'
 import { buildComposeMap, ComposeMapError } from './lib/composemap.mjs'
+import { buildSpringMap, SpringMapError } from './lib/springmap.mjs'
+import { buildJvmGraph, JvmGraphError } from './lib/jvmgraph.mjs'
+import { buildSqlMigrations, SqlMigrationsError } from './lib/sqlmigrations.mjs'
+import { buildNextRoutes, NextRoutesError } from './lib/nextroutes.mjs'
+import { buildHttpRoutes, HttpRoutesError } from './lib/httproutes.mjs'
+import { buildPhpRoutes, PhpRoutesError } from './lib/phproutes.mjs'
+import { detectCollectors } from './lib/stackdetect.mjs'
 import {
     ensureExcludeEntries,
     listWorkspaces,
@@ -98,10 +105,13 @@ function assertDocId(id) {
  * pattern, tracker MCP, runtime commands, source globs with project file names — starts
  * EMPTY and is edited into the config (data) per project. Existing configs are never
  * rewritten, so pre-0.3.0 stores keep their values.
+ * The map collectors are auto-detected from the repo's stack at creation time (stackdetect);
+ * an unknown stack seeds an empty list — the owner fills it in, the engine guesses nothing.
  * @param {{projectId: string, repo: string, mainBranch: string}} d
+ * @param {string[]} collectors detected map collectors (possibly empty)
  * @returns {object}
  */
-function buildConfig(d) {
+function buildConfig(d, collectors = []) {
     return {
         schema: 1,
         project: {
@@ -113,6 +123,7 @@ function buildConfig(d) {
         assurance: { level: 2 },
         language: 'en',
         map: {
+            collectors,
             routes: ['src/router/routes.ts'],
             stores: ['packages/*/src/stores/**'],
             packages: ['packages/*'],
@@ -184,12 +195,20 @@ async function cmdBootstrap(d, { dryRun, log, approve = false }) {
         step('store .gitignore', existsSync(path.join(d.root, '.gitignore')), () =>
             writeFileSync(path.join(d.root, '.gitignore'), STORE_GITIGNORE),
         )
-        step(CONFIG_NAME, existsSync(storeConfigPath(d.root)), () =>
+        step(CONFIG_NAME, existsSync(storeConfigPath(d.root)), () => {
+            // Stack auto-detection runs ONLY when the config is being created — an existing
+            // config is data and is never touched (data is precious).
+            const det = detectCollectors(d.repo)
             writeFileSync(
                 path.join(d.root, CONFIG_NAME),
-                JSON.stringify(buildConfig(d), null, 4) + '\n',
-            ),
-        )
+                JSON.stringify(buildConfig(d, det.collectors), null, 4) + '\n',
+            )
+            log(
+                det.collectors.length
+                    ? `map collectors detected: ${det.stack.join(', ')} → ${det.collectors.join(', ')}`
+                    : 'map: no known stack detected — map.collectors: []',
+            )
+        })
         for (const dir of STORE_DIRS)
             step(`${dir}/`, existsSync(path.join(d.root, dir)), () =>
                 mkdirSync(path.join(d.root, dir), { recursive: true }),
@@ -1004,6 +1023,82 @@ async function cmdMap(d, { dryRun, log, approve = false }) {
                 throw e
             }
             outputs.push({ rel: path.join('map', 'services.md'), content: cm.content, topic: 'map/services', label: `${cm.serviceCount} services` })
+        } else if (name === 'springmap') {
+            // The new stack collectors below share one absence contract: a missing stack
+            // marker (no controllers / no build root / no migrations / no pages / no
+            // matches) throws the collector's own Error subclass → SKIP with a note, never
+            // a fatal error — the remaining collectors still run.
+            let sm
+            try {
+                sm = buildSpringMap(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof SpringMapError) {
+                    log(`map: springmap skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'routes.md'), content: sm.content, topic: 'map/routes', label: `${sm.routeCount} routes (spring)` })
+        } else if (name === 'jvmgraph') {
+            let jg
+            try {
+                jg = buildJvmGraph(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof JvmGraphError) {
+                    log(`map: jvmgraph skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'packages.md'), content: jg.content, topic: 'map/packages', label: `${jg.moduleCount} modules` })
+        } else if (name === 'sqlmigrations') {
+            let sq
+            try {
+                sq = buildSqlMigrations(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof SqlMigrationsError) {
+                    log(`map: sqlmigrations skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'migrations.md'), content: sq.content, topic: 'map/migrations', label: `${sq.migrationCount} migrations` })
+        } else if (name === 'nextroutes') {
+            let nr
+            try {
+                nr = buildNextRoutes(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof NextRoutesError) {
+                    log(`map: nextroutes skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'routes.md'), content: nr.content, topic: 'map/routes', label: `${nr.routeCount} routes (next)` })
+        } else if (name === 'httproutes') {
+            let hr
+            try {
+                hr = buildHttpRoutes(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof HttpRoutesError) {
+                    log(`map: httproutes skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'routes.md'), content: hr.content, topic: 'map/routes', label: `${hr.routeCount} routes (http)` })
+        } else if (name === 'phproutes') {
+            let pr
+            try {
+                pr = buildPhpRoutes(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof PhpRoutesError) {
+                    log(`map: phproutes skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'routes.md'), content: pr.content, topic: 'map/routes', label: `${pr.routeCount} routes (php)` })
         } else {
             throw new ValidationError(`map: unknown collector "${name}" in kaut.config.json map.collectors`)
         }
