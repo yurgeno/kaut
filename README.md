@@ -1,5 +1,12 @@
 # KAUT — Knowledge Actualization Under Trust
 
+[![test](https://github.com/yurgeno/kaut/actions/workflows/test.yml/badge.svg)](https://github.com/yurgeno/kaut/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/yurgeno/kaut)](https://github.com/yurgeno/kaut/releases)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+![node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933?logo=nodedotjs&logoColor=white)
+![platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos-informational)
+![runtime deps](https://img.shields.io/badge/runtime%20deps-0-success)
+
 > **Makes legacy codebases AI-native.** KAUT is self-maintaining, AI-first documentation for
 > your project — a knowledge layer that makes undocumented, weak-context code legible to AI
 > agents. Not a memory of conversations — a knowledge base about the system itself: what it

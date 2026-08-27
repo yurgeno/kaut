@@ -1,0 +1,24 @@
+# The suite is the project's own claim of integrity — it must run on every push.
+# Zero dependencies: no install step; the engine runs on Node >= 20 (tested on current).
+name: test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # Bare `node --test` from the repo root, exactly as documented (passing the
+      # test directory as an argument fails to resolve the suite on newer Node).
+      - run: node --test
