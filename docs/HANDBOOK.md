@@ -436,9 +436,9 @@ Design is frozen (v1.0); building follows phases, each opened only by **journal 
 the previous one — never by enthusiasm. The detailed gate records, phase plans, and roadmap are
 development-process documents and live in the maintainers' private hub, not in this repo.
 
-Current release: **v0.5.0** (2026-08-27 — the guided install: `kaut setup` with sibling-repo
+Current release: **v0.6.0** (2026-08-27 — backup/restore of the data home + the guided install: `kaut setup` with sibling-repo
 scanning and the persistent data-home redirect, on top of v0.4.0's maintenance loop, MCP
-server, security hardening, and packaging). Suite: **166 tests**
+server, security hardening, and packaging). Suite: **170 tests**
 (bare `node --test`; do not pass the test directory — that form fails on Node ≥ 24).
 
 | Phase | Delivers | Status |
@@ -451,7 +451,7 @@ server, security hardening, and packaging). Suite: **166 tests**
 | 5 — Health (AL4) | Health index, audits, rollback machinery | trigger-based; `doctor` + `digest` cover the mechanical floor |
 | 6 — Box & scale (AL5) | Packaging, seed exchange | packaging shipped (LICENSE/package.json/CHANGELOG, git-clone install); benchmark harness deliberately external; seed exchange on the shelf |
 
-**What is live in v0.5.0:** the guided install (`setup`: data home → repo selection → optional bootstrap, strictly additive to existing data) and the `home` data-home redirect; `lookup` with freshness verdicts, trust tiers, and the `altitude`
+**What is live in v0.6.0:** `backup`/`restore` (the data home as a dated, versioned, restorable archive); the guided install (`setup`: data home → repo selection → optional bootstrap, strictly additive to existing data) and the `home` data-home redirect; `lookup` with freshness verdicts, trust tiers, and the `altitude`
 coverage band; tamper containment; the workspace thin slice (`workspace init|list`, member
 stores + ONE system store with `project.anchorRepo`, `map.collectors` + the `composemap` T0
 adapter, cross-repo `repo:<name>:file:` sources — existence-only at the member repo's HEAD);

@@ -21,7 +21,7 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.5.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.6.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
@@ -233,6 +233,9 @@ node <engine>/kaut.mjs touched <file>…        # which docs bind the given chan
 # telemetry:
 node <engine>/kaut.mjs note <topic> <result>  # record an in-session outcome (trusted|confirmed|insufficient|stale-misled)
 node <engine>/kaut.mjs digest [--since <ISO>] # aggregate journal telemetry across workspace stores
+# backup / restore (the whole data home — stores, registry, setup record):
+node <engine>/kaut.mjs backup                 # dated, versioned .tar.gz under <data>/backups/
+node <engine>/kaut.mjs restore [latest|<file>] [--force]   # no arg = list; never overwrites without --force
 # workspace (multi-repo):
 node <engine>/kaut.mjs workspace init --manifest <conductor>/manifest.json
                                      # registry + member stores + ONE system store anchored to the launcher
@@ -247,7 +250,7 @@ one server serves a whole multi-repo workspace. The owner-run escapes (`review -
 
 Flags: `--dry-run` (print actions without acting) · `--json` (machine output for
 `stale|lookup|refresh|review|touched|digest`) · `--quiet` · `--approve` / `--reject`
-(owner-run) · `--note <text>` (`note`, `review --reject`) · `--manifest <path>`
+(owner-run) · `--force` (`restore`: overwrite existing data) · `--note <text>` (`note`, `review --reject`) · `--manifest <path>`
 (`workspace init`) · `--workspace <name>` (`doctor`/`stale`/`digest` across a workspace) ·
 `--since <ISO-date>` (`digest`) · `--help`/`-h` (usage, exit 0).
 
@@ -286,10 +289,20 @@ The journal is append-only untracked telemetry and grows without bound; it is sa
 truncate old lines manually (it is never knowledge, and `digest` simply sees a shorter
 history).
 
+## Backup
+
+The data folder is the whole database — treat it accordingly. `kaut backup` packs the
+entire data home (every store with its git history, the workspace registry, the setup
+record) into a dated, versioned archive under `<data>/backups/` — a plain `.tar.gz`
+(hand-rolled ustar + node:zlib, zero dependencies) that any standard tar tool can also
+read. `kaut restore latest` (or a file name) brings it back; **nothing existing is ever
+overwritten without `--force`** — a refused restore lists the conflicts and touches
+nothing.
+
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 166 tests, zero deps (node:test)
+cd <engine> && node --test          # 170 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-08-27
+
+- `kaut backup` / `kaut restore`: the whole data home (stores with their git history, the
+  workspace registry, the setup record) packed into a dated, versioned, restorable
+  `.tar.gz` under `<data>/backups/` — hand-rolled ustar + node:zlib, zero dependencies,
+  readable by any standard tar tool. Restore never overwrites existing data without
+  `--force`; `restore` with no argument lists the available archives.
+
 ## 0.5.0 — 2026-08-27
 
 - `kaut setup`: the guided install. Clone the engine next to the repositories it serves,

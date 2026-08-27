@@ -24,6 +24,9 @@ why, [HANDBOOK.md](HANDBOOK.md); for the normative data contract, [SCHEMA.md](..
   `~/.kaut` itself. `KAUT_WORKSPACES_DIR` overrides just the registry directory. The engine
   checkout stays anchored at `~/.kaut/engine` (or wherever the caller invokes it) — only
   the DATA follows the redirect.
+- **Backups**: `kaut backup` → `<data>/backups/kaut-backup-<YYYYMMDD-HHMMSS>-v<engine>.tar.gz`
+  (plain ustar+gzip, zero deps, tar-readable); `kaut restore [latest|<file>]` refuses to
+  overwrite existing data without `--force`. The backups folder is excluded from archives.
 - **Journal**: `<store>/journal.jsonl` is append-only untracked telemetry and grows without
   bound; it is safe to truncate old lines manually (it is never knowledge, and `digest`
   simply sees a shorter history).

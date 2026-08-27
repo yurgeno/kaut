@@ -38,6 +38,7 @@ import { parseFrontmatter } from './lib/frontmatter.mjs'
 import { createContext, resolveAnchor, staleAll, verdictForDoc, VERDICT } from './lib/stale.mjs'
 import { buildRefresh, REFRESH } from './lib/refresh.mjs'
 import { draftPath, listDrafts, promoteDraft, removeDraft } from './lib/drafts.mjs'
+import { BACKUPS_DIR, packHome, parseArchive, restoreEntries } from './lib/backup.mjs'
 import { altitudeFor } from './lib/altitude.mjs'
 import { nearestDocs, renderLookup, renderMiss, renderTampered } from './lib/lookup.mjs'
 import { appendJournal, readJournal } from './lib/journal.mjs'
@@ -1171,7 +1172,7 @@ function storeConfig(root) {
 }
 
 const USAGE =
-    'usage: kaut.mjs <setup|bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--data <dir>] [--repos all|names] [--scan <dir>] [--bootstrap|--no-bootstrap] [--yes] [--dry-run] [--json] [--quiet]'
+    'usage: kaut.mjs <setup|bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|backup|restore|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--data <dir>] [--repos all|names] [--scan <dir>] [--bootstrap|--no-bootstrap] [--yes] [--force] [--dry-run] [--json] [--quiet]'
 
 /**
  * `kaut home [<dir>]` — show or set the knowledge-data home. This is the engine's own
@@ -1302,6 +1303,70 @@ async function cmdSetup({ log }, flags) {
     }
 }
 
+
+/**
+ * `kaut backup` — pack the ENTIRE knowledge-data home (stores with their git history,
+ * the workspace registry, setup.json) into a dated, versioned, restorable archive under
+ * `<home>/backups/`. Zero external dependencies: the archive is a hand-rolled ustar
+ * gzipped with node:zlib — restorable by `kaut restore` and readable by any tar tool.
+ * @param {{log: (s: string) => void}} opts
+ */
+function cmdBackup({ log }) {
+    const home = kautHome()
+    if (!existsSync(home)) throw new ValidationError(`knowledge-data home not found: ${home} — run "kaut setup" or "kaut home <dir>" first`)
+    const dir = path.join(home, BACKUPS_DIR)
+    mkdirSync(dir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
+    const file = path.join(dir, `kaut-backup-${stamp}-v${ENGINE_VERSION}.tar.gz`)
+    const { archive, files } = packHome(home, { version: ENGINE_VERSION })
+    writeFileSync(file, archive)
+    log(`backup written: ${file}`)
+    log(`  ${files} files, ${Math.max(1, Math.round(archive.length / 1024))} KB — restore with "kaut restore latest" (or the file name)`)
+}
+
+/**
+ * `kaut restore [<archive>|latest]` — restore the knowledge-data home from a backup.
+ * The data folder is precious: without --force nothing existing is ever overwritten —
+ * the restore refuses and lists the conflicts instead.
+ * @param {{log: (s: string) => void}} opts
+ * @param {string|undefined} target
+ * @param {{force: boolean}} flags
+ */
+function cmdRestore({ log }, target, { force }) {
+    const home = kautHome()
+    const dir = path.join(home, BACKUPS_DIR)
+    const available = existsSync(dir)
+        ? readdirSync(dir).filter((n) => n.startsWith('kaut-backup-') && n.endsWith('.tar.gz')).sort()
+        : []
+    if (!target) {
+        if (!available.length) {
+            log(`(no backups in ${dir} — create one with "kaut backup")`)
+            return
+        }
+        log(`backups in ${dir}:`)
+        for (const n of available) log(`  ${n}`)
+        log('restore with: kaut restore latest   (or one of the names above; --force to overwrite existing data)')
+        return
+    }
+    let file
+    if (target === 'latest') {
+        if (!available.length) throw new ValidationError(`no backups in ${dir}`)
+        file = path.join(dir, available[available.length - 1])
+    } else {
+        file = existsSync(target) ? target : path.join(dir, target)
+        if (!existsSync(file)) throw new ValidationError(`backup not found: ${target} (looked at ${file})`)
+    }
+    const { manifest, entries } = parseArchive(readFileSync(file))
+    if (manifest?.tool !== 'kaut-backup') throw new ValidationError(`not a kaut backup archive: ${file}`)
+    log(`restoring ${path.basename(file)} (engine v${manifest.engine}, created ${manifest.created})`)
+    const { written, conflicts } = restoreEntries(home, entries, { force })
+    if (conflicts.length && !force)
+        throw new ValidationError(
+            `restore refused — ${conflicts.length} file(s) already exist (the data folder is never silently overwritten): ${conflicts.slice(0, 5).join(', ')}${conflicts.length > 5 ? ` +${conflicts.length - 5} more` : ''} — re-run with --force to overwrite them`,
+        )
+    log(`restored ${written} file(s) into ${home}${force && conflicts.length ? ` (${conflicts.length} overwritten)` : ''}`)
+}
+
 async function main() {
     const { values, positionals } = parseArgs({
         allowPositionals: true,
@@ -1319,6 +1384,7 @@ async function main() {
             bootstrap: { type: 'boolean', default: false },
             'no-bootstrap': { type: 'boolean', default: false },
             yes: { type: 'boolean', default: false },
+            force: { type: 'boolean', default: false },
             workspace: { type: 'string' },
             since: { type: 'string' },
             note: { type: 'string' },
@@ -1341,7 +1407,7 @@ async function main() {
     // Some commands resolve stores from the registry, not cwd, so a non-store cwd is fine for them:
     // workspace-wide doctor/stale (--workspace) and `digest` (always registry-driven). Single-store
     // behavior is unchanged for every other command.
-    const cwdOptional = cmd === 'digest' || cmd === 'home' || cmd === 'setup' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
+    const cwdOptional = cmd === 'digest' || cmd === 'home' || cmd === 'setup' || cmd === 'backup' || cmd === 'restore' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
     let d = null
     try {
         d = discover()
@@ -1399,6 +1465,12 @@ async function main() {
             break
         case 'setup':
             await cmdSetup(opts, { data: values.data, repos: values.repos, scan: values.scan, bootstrap: values.bootstrap, noBootstrap: values['no-bootstrap'], yes: values.yes })
+            break
+        case 'backup':
+            cmdBackup(opts)
+            break
+        case 'restore':
+            cmdRestore(opts, rest[0], { force: values.force })
             break
         case 'home':
             cmdHome(opts, rest[0])
