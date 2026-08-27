@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-08-27
+
+- `kaut setup`: the guided install. Clone the engine next to the repositories it serves,
+  answer three questions (knowledge-data folder → persisted redirect; which sibling repos
+  to serve, scanned automatically; bootstrap now or later) and setup finishes with the two
+  wiring steps printed (MCP registration + the agent knowledge contract). Every question
+  has a flag (`--data/--repos/--scan/--bootstrap/--no-bootstrap/--yes`) for scripted runs.
+  Bootstrap stays strictly additive: existing store data is actualized, never wiped.
+- `kaut home <dir>`: persistent knowledge-data home redirect (the engine owns its data
+  location; callers and the MCP server resolve it with no env involved).
+- `map`: the route collector skips itself when the default routes file is absent (stack
+  mismatch, not an error) — the remaining collectors still run.
+- docs: agent wiring guide (docs/AGENT-INTEGRATION.md), MCP reference (docs/MCP.md),
+  community files, CI workflow, social preview.
+
 ## 0.4.0 — 2026-08-26
 
 **First public release.**

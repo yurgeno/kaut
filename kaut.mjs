@@ -21,8 +21,9 @@
  * Exit codes: 0 ok · 1 validation/doctor failure · 2 lock busy · 3 environment missing.
  */
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CONFIG_NAME, deriveProjectId, discover, EnvironmentError, kautAnchor, kautHome, resolveFreshnessRepo, storeConfigPath, tryGit } from './lib/discover.mjs'
@@ -1170,7 +1171,7 @@ function storeConfig(root) {
 }
 
 const USAGE =
-    'usage: kaut.mjs <bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--dry-run] [--json] [--quiet]'
+    'usage: kaut.mjs <setup|bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--data <dir>] [--repos all|names] [--scan <dir>] [--bootstrap|--no-bootstrap] [--yes] [--dry-run] [--json] [--quiet]'
 
 /**
  * `kaut home [<dir>]` — show or set the knowledge-data home. This is the engine's own
@@ -1180,13 +1181,8 @@ const USAGE =
  * @param {{log: (s: string) => void}} opts
  * @param {string|undefined} dir
  */
-function cmdHome({ log }, dir) {
+function setDataHome(dir) {
     const cfgPath = path.join(kautAnchor(), 'config.json')
-    if (!dir) {
-        const source = process.env.KAUT_HOME ? 'env KAUT_HOME' : existsSync(cfgPath) ? `redirect ${cfgPath}` : 'default'
-        log(`${kautHome()} (${source})`)
-        return
-    }
     const root = path.resolve(dir)
     mkdirSync(root, { recursive: true }) // instance data folder — create, never delete
     mkdirSync(kautAnchor(), { recursive: true })
@@ -1198,7 +1194,112 @@ function cmdHome({ log }, dir) {
     }
     cfg.dataRoot = root
     writeFileSync(cfgPath, JSON.stringify(cfg, null, 4) + '\n')
+    return { root, cfgPath }
+}
+
+function cmdHome({ log }, dir) {
+    const cfgPath = path.join(kautAnchor(), 'config.json')
+    if (!dir) {
+        const source = process.env.KAUT_HOME ? 'env KAUT_HOME' : existsSync(cfgPath) ? `redirect ${cfgPath}` : 'default'
+        log(`${kautHome()} (${source})`)
+        return
+    }
+    const { root } = setDataHome(dir)
     log(`knowledge-data home set: ${root} (redirect: ${cfgPath})`)
+}
+
+
+/**
+ * `kaut setup` — the guided install (interactive; every question has a flag for
+ * scripted runs). The whole flow the operator sees after cloning the engine NEXT TO the
+ * project repos it will serve:
+ *   1. where knowledge data lives (persisted via the `kaut home` redirect);
+ *   2. which sibling repositories to serve (scanned from the engine's parent folder);
+ *   3. whether to run bootstrap now.
+ * The data folder is LIVE DATA and is treated accordingly: setup and bootstrap only
+ * create what is absent — nothing existing is ever wiped, rewritten, or re-seeded
+ * (bootstrap's own check → create-only-if-absent law).
+ * @param {{log: (s: string) => void}} opts
+ * @param {{data?: string, repos?: string, scan?: string, bootstrap?: boolean, noBootstrap?: boolean, yes?: boolean}} flags
+ */
+async function cmdSetup({ log }, flags) {
+    const interactive = process.stdin.isTTY && !flags.yes
+    const rl = interactive ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null
+    const ask = async (q, dflt) => {
+        if (!rl) return dflt
+        const a = (await rl.question(`${q}${dflt ? ` [${dflt}]` : ''}: `)).trim()
+        return a || dflt
+    }
+    try {
+        const scanDir = path.resolve(flags.scan || path.dirname(ENGINE_DIR))
+
+        // 1. The knowledge-data home — the redirect makes every later caller (CLI, MCP)
+        //    resolve it without env or orchestrator involvement.
+        const currentHome = kautHome()
+        const dataDflt = flags.data || (currentHome !== kautAnchor() ? currentHome : path.join(scanDir, 'kaut-data'))
+        const dataDir = flags.data || (await ask('Knowledge data folder (LIVE data — never deleted by the engine)', dataDflt))
+        const { root: dataRoot } = setDataHome(dataDir)
+        log(`data home: ${dataRoot} (persisted — every kaut command and the MCP server resolve it themselves)`)
+
+        // 2. Which sibling repositories to serve. The engine clone is expected NEXT TO
+        //    the project repos; anything with a .git that is not the engine or the data
+        //    folder is a candidate.
+        const candidates = readdirSync(scanDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+            .map((e) => path.join(scanDir, e.name))
+            .filter((p) => p !== ENGINE_DIR && p !== dataRoot && existsSync(path.join(p, '.git')))
+            .sort()
+        if (candidates.length === 0)
+            throw new ValidationError(`no git repositories found next to the engine (scanned ${scanDir}) — clone the engine beside the projects it should serve, or pass --scan <dir>`)
+        log(`\nrepositories found in ${scanDir}:`)
+        candidates.forEach((p, i) => log(`  ${String(i + 1).padStart(2)}. ${path.basename(p)}`))
+        const rawSel = flags.repos || (await ask('Serve which repositories? (all · numbers · names, comma-separated)', 'all'))
+        const wanted = String(rawSel).trim().toLowerCase() === 'all'
+            ? candidates
+            : String(rawSel).split(',').map((t) => t.trim()).filter(Boolean).map((t) => {
+                  const byNum = /^\d+$/.test(t) ? candidates[Number(t) - 1] : undefined
+                  const byName = candidates.find((p) => path.basename(p) === t)
+                  const hit = byNum ?? byName
+                  if (!hit) throw new ValidationError(`unknown repository selection "${t}" — use "all", a number from the list, or an exact folder name`)
+                  return hit
+              })
+        log(`selected: ${wanted.map((p) => path.basename(p)).join(', ')}`)
+
+        // 3. Bootstrap now? (idempotent per repo: existing stores are ACTUALIZED, never
+        //    re-seeded — every step is create-only-if-absent.)
+        const wantBootstrap = flags.bootstrap ? true : flags.noBootstrap ? false : (await ask('Run bootstrap for the selected repositories now? (y/n)', 'y')).toLowerCase().startsWith('y')
+
+        if (wantBootstrap) {
+            for (const repo of wanted) {
+                const d = discover({ cwd: repo })
+                const created = !existsSync(d.root)
+                await cmdBootstrap(d, { dryRun: false, log: () => {}, approve: false })
+                log(`  ${created ? 'bootstrapped' : 'actualized  '} ${path.basename(repo)} → ${d.root}${created ? '' : ' (existing data untouched)'}`)
+            }
+        } else {
+            log('bootstrap skipped — run later, per repo, from its root:')
+            for (const repo of wanted) log(`  cd ${repo} && node ${ENGINE_DIR}/kaut.mjs bootstrap`)
+        }
+
+        // The selection is instance data — recorded in the data home for reference and
+        // for re-running setup non-interactively later.
+        writeFileSync(
+            path.join(dataRoot, 'setup.json'),
+            JSON.stringify({ schema: 1, scanDir, repos: wanted.map((p) => ({ name: path.basename(p), path: p })), bootstrapped: wantBootstrap, at: new Date().toISOString() }, null, 4) + '\n',
+        )
+
+        // 4. What comes next — the two moves that make agents actually use the store.
+        log(`\ndone. Next steps:`)
+        log(`  1. Connect the MCP server to your harness — e.g. Claude Code .mcp.json:`)
+        log(`       { "mcpServers": { "kaut": { "command": "node", "args": ["${path.join(ENGINE_DIR, 'mcp.mjs')}"] } } }`)
+        log(`     (Codex: [mcp_servers.kaut] in .codex/config.toml — see docs/MCP.md)`)
+        log(`  2. Teach your agents the discipline: paste the knowledge contract into your`)
+        log(`     CLAUDE.md / AGENTS.md / system prompt, or add it as a skill/description —`)
+        log(`     the paste-ready block lives in docs/AGENT-INTEGRATION.md.`)
+        log(`  Try it: cd <repo> && node ${ENGINE_DIR}/kaut.mjs lookup   (the catalog of topics)`)
+    } finally {
+        rl?.close()
+    }
 }
 
 async function main() {
@@ -1212,6 +1313,12 @@ async function main() {
             reject: { type: 'boolean', default: false },
             help: { type: 'boolean', short: 'h', default: false },
             manifest: { type: 'string' },
+            data: { type: 'string' },
+            repos: { type: 'string' },
+            scan: { type: 'string' },
+            bootstrap: { type: 'boolean', default: false },
+            'no-bootstrap': { type: 'boolean', default: false },
+            yes: { type: 'boolean', default: false },
             workspace: { type: 'string' },
             since: { type: 'string' },
             note: { type: 'string' },
@@ -1234,7 +1341,7 @@ async function main() {
     // Some commands resolve stores from the registry, not cwd, so a non-store cwd is fine for them:
     // workspace-wide doctor/stale (--workspace) and `digest` (always registry-driven). Single-store
     // behavior is unchanged for every other command.
-    const cwdOptional = cmd === 'digest' || cmd === 'home' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
+    const cwdOptional = cmd === 'digest' || cmd === 'home' || cmd === 'setup' || (!!values.workspace && (cmd === 'doctor' || cmd === 'stale'))
     let d = null
     try {
         d = discover()
@@ -1289,6 +1396,9 @@ async function main() {
             break
         case 'workspace':
             await cmdWorkspace(opts, rest, values.manifest)
+            break
+        case 'setup':
+            await cmdSetup(opts, { data: values.data, repos: values.repos, scan: values.scan, bootstrap: values.bootstrap, noBootstrap: values['no-bootstrap'], yes: values.yes })
             break
         case 'home':
             cmdHome(opts, rest[0])

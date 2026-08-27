@@ -21,7 +21,7 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.4.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.5.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
@@ -136,41 +136,43 @@ drafts you review in batch. A wiki decays by default; KAUT's default is to confe
 
 ## Quickstart
 
-The supported install is a git clone. The canonical location is `~/.kaut/engine`, but any
-path works — the engine is invoked as `node <engine>/kaut.mjs` and resolves everything else
-itself (an orchestration framework consuming KAUT, e.g. TAUT, records the engine location in
-its own configuration). There is no `npm install` step — the engine has zero dependencies.
-
-Optional install step — choose where knowledge lives (stores + workspace registry).
-Default is `~/.kaut`; to keep the data in a dedicated folder (backups, visibility, its own
-lifecycle) record a redirect once:
+**1. Clone the engine next to the repositories it will serve** (a sibling folder — setup
+scans its neighbors; there is no `npm install`, the engine has zero dependencies):
 
 ```bash
-node <engine>/kaut.mjs home ~/kaut-data
+cd ~/projects && git clone https://github.com/yurgeno/kaut.git
 ```
 
-The redirect persists at `~/.kaut/config.json`, so every later caller — CLI or the MCP
-server — resolves the data location by itself; nothing to export, nothing for an
-orchestrator to pass. `kaut home` (no argument) shows the current home and where it came
-from; the `KAUT_HOME` env var still outranks the redirect for one-off overrides.
-
-From your project directory run
+**2. Run setup** — three questions, and every answer has a flag for scripted installs:
 
 ```bash
-node <engine>/kaut.mjs bootstrap
+node kaut/kaut.mjs setup
 ```
 
-once — it creates the knowledge store outside your repo and verifies itself (`doctor`). Then
-generate the project map (route table + package graph):
+- **Knowledge data folder** — where the stores live (default: `<siblings>/kaut-data`).
+  Persisted once (the `kaut home` redirect): every later command and the MCP server
+  resolve it themselves — nothing to export, nothing to pass. **This folder is live
+  data**: the engine only ever adds to it; nothing existing is wiped or rewritten.
+- **Which repositories** — setup lists every sibling git repository; answer `all`,
+  numbers, or names.
+- **Bootstrap now?** — yes creates/actualizes a store per selected repo on the spot
+  (idempotent: existing stores are actualized, never re-seeded); no just records the
+  configuration and prints the per-repo commands for later.
+
+Non-interactive: `node kaut/kaut.mjs setup --data <dir> --repos all --bootstrap --yes`
+(`--no-bootstrap`, `--scan <dir>` to scan elsewhere).
+
+**3. Follow the printed next steps** — setup ends with exactly two: connect the MCP
+server to your harness, and paste the knowledge contract into your agent instructions
+(both below). Optionally generate the mechanical map per repo:
 
 ```bash
-node <engine>/kaut.mjs map
+node kaut/kaut.mjs map
 ```
 
-Note: the default `map` globs are Vue/monorepo-conventional (`src/router/routes.ts`,
-`packages/*`); on other stacks the route collector is skipped with a "routes file not found" note and the rest still run. Point
-`map.routesFile`/`map.packagesDir` at your stack's files in the store config, trim
-`map.collectors`, or skip `map` entirely.
+(the default `map` globs are Vue/monorepo-conventional; on other stacks the route
+collector skips itself with a note and the rest still run — point
+`map.routesFile`/`map.packagesDir` at your stack's files, or skip `map` entirely).
 
 ## Wiring your agents — the step that makes it real
 
@@ -287,7 +289,7 @@ history).
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 162 tests, zero deps (node:test)
+cd <engine> && node --test          # 166 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24
