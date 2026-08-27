@@ -6,9 +6,13 @@
 > does, how it is structured, and why. It turns what agents learn while working into living
 > documentation — so no session starts from zero.
 
-Zero-dependency Node.js (≥ 20, developed on 24), macOS/Linux, Apache-2.0. Sibling project of
-the TAUT orchestration framework ([github.com/yurgeno/taut](https://github.com/yurgeno/taut)):
-TAUT drives agents, KAUT is what they know.
+Zero-dependency Node.js (≥ 20, developed on 24), macOS/Linux, Apache-2.0.
+
+**A complete, standalone product.** One `git clone` is the whole install; point your harness
+at the bundled MCP server (or call the CLI from any skill/prompt) and it works — no
+orchestrator, no framework, no services, no accounts, nothing else to deploy. It composes
+with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
+agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
 **Status: v0.4.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
@@ -40,22 +44,64 @@ them safely and cheaply.
 
 ## What KAUT is — and is not
 
-KAUT is **not** "yet another cross-session memory" for an AI agent. Plenty of those exist,
-and they remember *conversations*. KAUT is the **project's documentation, written AI-first**:
-a knowledge base about the system itself — what it does, how it is structured, why it was
-built this way — where every entry is tied to its sources and automatically checked for
-freshness.
+Three familiar categories look similar from a distance. KAUT is none of them — and the
+differences are exactly where the value is.
 
-The simplest way to tell the two apart:
+| | What it stores | How it stays true | What happens when the code changes |
+|---|---|---|---|
+| **Agent memory** | conversations, preferences | it doesn't — episodic recall is unverifiable | nothing; yesterday's recollection is served as-is |
+| **RAG / embeddings** | chunks of whatever text exists | it doesn't — retrieval has no freshness or provenance contract | stale chunks keep ranking high, served with full confidence |
+| **A wiki / auto-generated docs** | prose someone once wrote (or an LLM once guessed) | manual diligence | it rots silently; nothing warns the reader |
+| **KAUT** | distilled, curated facts, each bound to its sources and anchored to a commit | freshness is **computed from git** on every read; a gated write path keeps humans in charge of judgment-tier knowledge | the verdict flips to `stale` automatically, and the answer says "re-check this" instead of pretending |
 
-- **Memory** answers *"what did we talk about, what does this user prefer?"* — personal,
-  episodic, unverifiable.
-- **KAUT** answers *"how does this project work, and why?"* — documentation: organized by
-  domain, source-bound, freshness-checked, trust-labeled, and readable by any agent **and by
-  humans**.
+**Not another memory system.** Memory answers *"what did we talk about, what does this user
+prefer?"* — personal, episodic, unverifiable. KAUT answers *"how does this project work, and
+why?"* — documentation: organized by domain, source-bound, freshness-checked, trust-labeled,
+and readable by any agent **and by humans**. Personal notes never enter KAUT; project
+knowledge never stays trapped in one agent's memory. That boundary is built into the write
+path.
 
-Personal notes never enter KAUT; project knowledge never stays trapped in one agent's
-memory. That boundary is built into the write path.
+**Not RAG.** Retrieval-augmented generation indexes whatever text happens to exist and
+serves the best-matching chunks — with no idea whether they are still true. KAUT stores the
+*opposite* selection: only knowledge that is **expensive to re-derive and not cheaply visible
+in the code** (the storage litmus), distilled into short docs a model reads whole — no
+embeddings, no ranking, no chunk soup. And every doc carries a machine-checked freshness
+verdict: anchored to the commit it was derived from, diffed against the tracked main branch
+on every read, **erring toward stale** when git cannot prove otherwise. Run RAG over your
+code if you like — KAUT is for what the code does *not* say: the why, the cross-cutting
+invariants, the tribal knowledge.
+
+**Not an LLM wiki.** Auto-generated documentation is plausible text, unverified at birth and
+abandoned at first commit. A KAUT doc cannot exist without typed source bindings and an
+anchor commit — and cannot *stay* wrong silently, because the sources are diffed on every
+read. The write path is the other half: mechanical layers regenerate automatically, agents
+may land operational facts they verified in-session, but judgment-tier knowledge (decisions,
+domain semantics, contracts) only enters through a human-approved gate — updates queue as
+drafts you review in batch. A wiki decays by default; KAUT's default is to confess.
+
+## Principles
+
+1. **Source-bound, commit-anchored.** Every fact names the files it came from and the commit
+   it was derived at. No source, no doc — the contract is validated at the door.
+2. **Err toward stale.** Freshness is a pure git computation (merge-base against the tracked
+   main branch). When git cannot prove a doc is current, the verdict says so. KAUT never
+   cries "fresh" when unsure — a false "stale" costs a re-check; a false "fresh" ships a bug.
+3. **Knowledge informs; it never authorizes.** A healthy verdict is permission to skip
+   re-derivation, not permission to act. Verdicts route *trust*: healthy + precise = usable
+   as-is; stale / broken / coarse-altitude = confirm in code first.
+4. **Serve nothing you can't vouch for.** The store is read by AI agents, so an out-of-pipeline
+   edit is an injection channel, not a convenience. Anything not byte-identical to the last
+   pipeline commit is withheld entirely (`tampered`) until restored or legitimately landed.
+5. **Humans own judgment; agents own mechanics.** The layered write gate: maps regenerate
+   freely, verified operational facts land at agent tier, and decision/domain/contract
+   knowledge waits in a draft queue for the owner's one-keystroke review.
+6. **Repair where it's cheapest.** Freshness decay is fought structurally, not heroically:
+   the change site (`touched` names the docs a code change owes), the read site (a stale
+   verdict arrives with a `refresh` delta bundle — exactly what changed, against what to
+   re-derive), and honest telemetry (`digest`) to see whether upkeep keeps pace.
+7. **Local-first, zero-dependency, repo-untouched.** One clone, no install step, no daemon,
+   no cloud; the knowledge store lives outside your repository, and freshness checks cost
+   git comparisons — not model calls.
 
 ## What KAUT does
 
@@ -217,7 +263,7 @@ history).
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 160 tests, zero deps (node:test)
+cd <engine> && node --test          # 162 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24
@@ -235,6 +281,18 @@ Your repository was never modified to begin with — there is nothing else to cl
 No. Agent memory remembers conversations and preferences; KAUT is the project's
 documentation — AI-first, source-bound, freshness-checked. The write path enforces the
 boundary: project knowledge goes to KAUT, personal preferences go to the agent's own memory.
+
+**Is this RAG?**
+No. There are no embeddings, no chunking, no retrieval ranking. KAUT stores a small set of
+distilled docs an agent reads whole, each with provenance and a git-computed freshness
+verdict — and deliberately stores only what is *not* cheaply derivable from the code. RAG
+over your codebase and KAUT answer different questions and coexist fine.
+
+**Is this an auto-generated wiki?**
+No. Nothing enters the store as unverified generated prose: every doc must carry typed
+source bindings and a commit anchor, mechanical layers are regenerated (not hallucinated),
+and judgment-tier knowledge passes a human-approved gate. And unlike a wiki, a KAUT doc
+cannot rot silently — its sources are diffed on every read.
 
 **Will it commit anything into my repository?**
 No. At most one ignored pointer file. The knowledge store lives outside the repo.
@@ -254,11 +312,16 @@ near-nothing: freshness checks are pure git comparisons — no AI calls involved
 
 ## Learn more
 
+- **The project wiki** — Getting Started, Connecting Your Project, Core Concepts, the
+  Maintenance Loop, FAQ and Troubleshooting in guided form
 - [docs/HANDBOOK.md](docs/HANDBOOK.md) — how it all works, in human language but in full detail
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — operator reference: on-disk layout, resolution,
   tamper containment, write gate, engine internals
+- [docs/MCP.md](docs/MCP.md) — the MCP server reference: registration, all 7 tools, protocol
 - [SCHEMA.md](SCHEMA.md) — the normative data contract this engine implements
 - [CHANGELOG.md](CHANGELOG.md) — release history
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) ·
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## License & citation
 
