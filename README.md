@@ -145,6 +145,57 @@ keeps it true. The normative mapping lives in [SCHEMA.md](SCHEMA.md).
   writes as MCP tools, for any MCP-capable harness or orchestrator. One server handles a
   whole multi-repo workspace (each call names its repo).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph clients["Clients"]
+        direction TB
+        HARNESS["AI agents\nany MCP-capable harness"]
+        HUMAN["Humans and CI\nshell, scripts"]
+        ORCH["Orchestrator, e.g. TAUT\n(optional)"]
+    end
+
+    subgraph engine["KAUT engine - stateless, zero-dep Node, no daemon"]
+        direction TB
+        SURF["Two surfaces\nmcp.mjs - 7 MCP tools\nkaut.mjs - CLI"]
+        READP["READ path (lock-free)\nlookup / stale / digest\nfreshness verdict = pure git computation\n+ trust tier + altitude on every answer"]
+        WRITEP["WRITE path (one chokepoint)\nlayered write gate + draft queue\nagent tier lands, judgment tier\nwaits for owner review"]
+        MAINTP["Maintenance loop\nrefresh / touched / note\nmap collectors (stack adapters)"]
+    end
+
+    subgraph home["Knowledge data home - set once with kaut home"]
+        direction TB
+        STORES["One store per repo\ntyped markdown + frontmatter\nown private git = audit + rollback\njournal telemetry"]
+        REG["workspaces registry\nmember stores + one system store"]
+        BACK["backups/\nkaut backup / restore"]
+    end
+
+    REPOS["Your repositories\nREAD-ONLY sources\n(at most one git-ignored pointer file)"]
+    OKFB["OKF v0.2 bundle\nkaut okf export"]
+
+    HARNESS --> SURF
+    HUMAN --> SURF
+    ORCH --> SURF
+    SURF --> READP
+    SURF --> WRITEP
+    SURF --> MAINTP
+    READP -- "diff sources against\nthe anchor commit" --> REPOS
+    MAINTP -- "derive maps from code" --> REPOS
+    READP <--> STORES
+    WRITEP --> STORES
+    STORES --> OKFB
+```
+
+The shape in four sentences. The **engine is stateless** — every command (CLI or MCP tool)
+computes its answer from two git histories and exits; there is nothing resident to run, sync,
+or corrupt. **Knowledge lives outside your repositories**, one store per repo in the data
+home, and each store is its own private git repository — which is what makes the write gate,
+tamper containment, audit, and rollback possible. The **read path never blocks and never
+guesses**: a verdict is derived by diffing a doc's typed sources against its anchor commit at
+the moment you ask. The **write path has exactly one chokepoint**, so policy (agent tier vs
+owner review) cannot be bypassed by choosing a different command.
+
 ## Quickstart
 
 **1. Clone the engine next to the repositories it will serve** (a sibling folder — setup
