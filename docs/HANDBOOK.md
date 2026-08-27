@@ -297,6 +297,27 @@ tools: `kaut_lookup`, `kaut_note`, `kaut_refresh`, `kaut_touched`, `kaut_draft`,
 Launch: `node <engine>/mcp.mjs` from any cwd (tools take `repo` per call). Skills keep the
 discipline (tiers, hard gate, repair-or-queue); MCP carries the mechanics.
 
+### 8d. OKF interop: `kaut okf check|stamp|export` (2026-08-27)
+
+KAUT stores are near-conformant OKF (Open Knowledge Format) v0.2 bundles in place — the
+format is rented, the freshness/trust engine stays ours. Three verbs close the gap:
+
+- **`kaut okf check`** — the in-place conformance report: how many concept docs, which lack
+  an explicit `type:` (legacy docs — on read the type is back-derived from the id, but OKF's
+  hard bar wants it physically present), which are contract-invalid. Exit 0 only when fully
+  conformant. Read-only.
+- **`kaut okf stamp`** — backfills the missing `type:` lines by round-tripping each doc
+  through the serializer (which injects `type` = the id's layer on every doc it writes,
+  engine-wide) and lands the rewrite through the ordinary commit chokepoint — owner-gated
+  layers need `--approve`, and a refusal aborts before anything is rewritten. Idempotent.
+- **`kaut okf export --out <dir>`** — projects the store's HEAD (committed content only)
+  into a standalone conformant bundle: full OKF frontmatter per concept (`sources` as
+  resource mappings, a `generated` block from the doc's provenance and store history, a
+  `verified` list derived from `[owner-approved: …]` commits — omitted when none, honestly
+  unverified), native fields riding as legal OKF extension keys, bodies verbatim, plus the
+  reserved `index.md` (with `okf_version: "0.2"`) and `log.md`. Refuses a non-empty target
+  without `--force`; never exports INDEX.md, telemetry, config, or the draft queue.
+
 For history that predates KAUT, **on-demand collectors** exist — e.g., tracing a code line to
 its ticket via commit prefixes, then reading the ticket (strictly read-only) to recover the
 "why". Collectors run when a task needs them, never as bulk imports: bulk imports are how
@@ -436,9 +457,9 @@ Design is frozen (v1.0); building follows phases, each opened only by **journal 
 the previous one — never by enthusiasm. The detailed gate records, phase plans, and roadmap are
 development-process documents and live in the maintainers' private hub, not in this repo.
 
-Current release: **v0.7.0** (2026-08-27 — stack adapters with auto-detection + backup/restore + the guided install: `kaut setup` with sibling-repo
+Current release: **v0.8.0** (2026-08-27 — OKF v0.2 conformance: `okf check|stamp|export`; previously stack adapters with auto-detection + backup/restore + the guided install: `kaut setup` with sibling-repo
 scanning and the persistent data-home redirect, on top of v0.4.0's maintenance loop, MCP
-server, security hardening, and packaging). Suite: **204 tests**
+server, security hardening, and packaging). Suite: **211 tests**
 (bare `node --test`; do not pass the test directory — that form fails on Node ≥ 24).
 
 | Phase | Delivers | Status |
@@ -451,7 +472,7 @@ server, security hardening, and packaging). Suite: **204 tests**
 | 5 — Health (AL4) | Health index, audits, rollback machinery | trigger-based; `doctor` + `digest` cover the mechanical floor |
 | 6 — Box & scale (AL5) | Packaging, seed exchange | packaging shipped (LICENSE/package.json/CHANGELOG, git-clone install); benchmark harness deliberately external; seed exchange on the shelf |
 
-**What is live in v0.7.0:** stack auto-detection at bootstrap + the springmap/jvmgraph/nextroutes/httproutes/phproutes/sqlmigrations collectors; `backup`/`restore` (the data home as a dated, versioned, restorable archive); the guided install (`setup`: data home → repo selection → optional bootstrap, strictly additive to existing data) and the `home` data-home redirect; `lookup` with freshness verdicts, trust tiers, and the `altitude`
+**What is live in v0.8.0:** OKF v0.2 conformance (type stamped on every write; `okf check`/`stamp`/`export` — export = fully idiomatic OKF bundle); stack auto-detection at bootstrap + the springmap/jvmgraph/nextroutes/httproutes/phproutes/sqlmigrations collectors; `backup`/`restore` (the data home as a dated, versioned, restorable archive); the guided install (`setup`: data home → repo selection → optional bootstrap, strictly additive to existing data) and the `home` data-home redirect; `lookup` with freshness verdicts, trust tiers, and the `altitude`
 coverage band; tamper containment; the workspace thin slice (`workspace init|list`, member
 stores + ONE system store with `project.anchorRepo`, `map.collectors` + the `composemap` T0
 adapter, cross-repo `repo:<name>:file:` sources — existence-only at the member repo's HEAD);

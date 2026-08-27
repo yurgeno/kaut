@@ -6,6 +6,7 @@
 ![node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933?logo=nodedotjs&logoColor=white)
 ![platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos-informational)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-0-success)
+[![OKF](https://img.shields.io/badge/OKF-v0.2-blueviolet)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
 
 > **Makes legacy codebases AI-native.** KAUT is self-maintaining, AI-first documentation for
 > your project — a knowledge layer that makes undocumented, weak-context code legible to AI
@@ -86,6 +87,14 @@ read. The write path is the other half: mechanical layers regenerate automatical
 may land operational facts they verified in-session, but judgment-tier knowledge (decisions,
 domain semantics, contracts) only enters through a human-approved gate — updates queue as
 drafts you review in batch. A wiki decays by default; KAUT's default is to confess.
+
+**And it is not a proprietary silo.** KAUT is an implementation of the vendor-neutral
+[Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) — stores are typed-markdown
+concept documents that satisfy OKF's conformance bar in place, and `kaut okf export`
+projects any store into a fully idiomatic OKF v0.2 bundle (provenance, trust and lifecycle
+families included), readable by any OKF consumer. KAUT's freshness/trust machinery rides
+on top as OKF-protected extension keys: the format records knowledge — the engine is what
+keeps it true. The normative mapping lives in [SCHEMA.md](SCHEMA.md).
 
 ## Principles
 
@@ -259,6 +268,10 @@ node <engine>/kaut.mjs digest [--since <ISO>] # aggregate journal telemetry acro
 # backup / restore (the whole data home — stores, registry, setup record):
 node <engine>/kaut.mjs backup                 # dated, versioned .tar.gz under <data>/backups/
 node <engine>/kaut.mjs restore [latest|<file>] [--force]   # no arg = list; never overwrites without --force
+# open format (OKF v0.2):
+node <engine>/kaut.mjs okf check              # store-as-OKF-bundle conformance report (exit 0 = conformant)
+node <engine>/kaut.mjs okf stamp              # backfill `type:` on legacy docs (through the write gate)
+node <engine>/kaut.mjs okf export --out <dir> # project committed HEAD into an idiomatic OKF v0.2 bundle
 # workspace (multi-repo):
 node <engine>/kaut.mjs workspace init --manifest <conductor>/manifest.json
                                      # registry + member stores + ONE system store anchored to the launcher
@@ -273,7 +286,7 @@ one server serves a whole multi-repo workspace. The owner-run escapes (`review -
 
 Flags: `--dry-run` (print actions without acting) · `--json` (machine output for
 `stale|lookup|refresh|review|touched|digest`) · `--quiet` · `--approve` / `--reject`
-(owner-run) · `--force` (`restore`: overwrite existing data) · `--note <text>` (`note`, `review --reject`) · `--manifest <path>`
+(owner-run) · `--force` (`restore`: overwrite existing data; `okf export`: write into a non-empty dir) · `--out <dir>` (`okf export`) · `--note <text>` (`note`, `review --reject`) · `--manifest <path>`
 (`workspace init`) · `--workspace <name>` (`doctor`/`stale`/`digest` across a workspace) ·
 `--since <ISO-date>` (`digest`) · `--help`/`-h` (usage, exit 0).
 
@@ -356,6 +369,12 @@ source bindings and a commit anchor, mechanical layers are regenerated (not hall
 and judgment-tier knowledge passes a human-approved gate. And unlike a wiki, a KAUT doc
 cannot rot silently — its sources are diffed on every read.
 
+**Is the store format proprietary?**
+No — the opposite. KAUT implements the vendor-neutral [Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md):
+plain typed-markdown concept documents. Any OKF consumer can read a store, and
+`kaut okf export` produces a fully idiomatic OKF bundle. No lock-in: your knowledge is
+portable markdown in a git repo either way.
+
 **Will it commit anything into my repository?**
 No. At most one ignored pointer file. The knowledge store lives outside the repo.
 
@@ -382,7 +401,8 @@ near-nothing: freshness checks are pure git comparisons — no AI calls involved
 - [docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md) — wiring agents to the store: the
   knowledge contract, per-harness snippets, a skill template, a worked session
 - [docs/MCP.md](docs/MCP.md) — the MCP server reference: registration, all 7 tools, protocol
-- [SCHEMA.md](SCHEMA.md) — the normative data contract this engine implements
+- [SCHEMA.md](SCHEMA.md) — the normative data contract this engine implements (incl. the
+  [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) conformance mapping)
 - [CHANGELOG.md](CHANGELOG.md) — release history
 - [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) ·
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)

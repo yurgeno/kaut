@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.0 — 2026-08-27
+
+OKF v0.2 conformance — KAUT is an implementation of the vendor-neutral
+[Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md).
+
+- `type:` is now stamped on every doc the engine writes (injected at the single
+  serialization chokepoint; == the layer, validated). Legacy docs still read fine
+  (back-derived from the path).
+- New verb `kaut okf`:
+  - `okf check` — store-as-OKF-bundle conformance report (exit 0 = conformant);
+  - `okf stamp` — backfills `type:` on legacy docs through the ordinary write gate
+    (`--approve` for owner-tier layers); idempotent;
+  - `okf export --out <dir>` — projects the store's committed HEAD into a fully
+    idiomatic OKF v0.2 bundle: OKF-shaped `sources` entries, `generated: {by, at}`
+    (actor convention, doc's last store commit), `verified:` events recovered from
+    owner-gate approvals in store history (`by: human:<owner>` — the OKF
+    human-reviewed tier), bundle-root `index.md` with `okf_version: "0.2"`, `log.md`
+    from store history; all KAUT-native keys ride along as OKF-protected extension
+    keys; bodies verbatim. Refuses a non-empty target without `--force`.
+- SCHEMA: the OKF section rewritten against v0.2 (two conformance surfaces, the full
+  field mapping, one disclosed deviation: the native `sources` key keeps its typed-string
+  shape in place — idiomatic shape is produced on export).
+- Suite: 204 → 211 tests.
+
 ## 0.7.0 — 2026-08-27
 
 - Stack adapters + auto-detection: bootstrap now detects the repo's stack and seeds

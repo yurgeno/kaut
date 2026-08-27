@@ -352,41 +352,69 @@ pointer, no working-tree files). System store id: `system-<name>--<sha8("workspa
 — deterministic, collision-free with the launcher's own store. Env seams: `KAUT_HOME`
 relocates the whole `~/.kaut` base; `KAUT_WORKSPACES_DIR` relocates just the registries.
 
-## OKF conformance (schema_version 1, additive — engine 0.3.x)
+## OKF conformance (OKF v0.2 — engine 0.8.x, additive)
 
-KAUT is a conformant producer/consumer of the **Open Knowledge Format** (OKF v0.1 — typed markdown +
-YAML frontmatter + cross-link graph; vendor-neutral). The relationship is *Hibernate:JPA :: KAUT:OKF*
-— KAUT IMPLEMENTS the format and EXTENDS it with the freshness/trust/provenance OKF leaves out of
-scope. Additive only: no existing key is renamed or retyped. The full frozen field mapping + provenance
-live in the maintainers' private hub (a development-process doc, not in this repo).
+KAUT implements the **Open Knowledge Format** (OKF v0.2 — typed markdown + YAML frontmatter +
+cross-link conventions; vendor-neutral; spec:
+https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md). The relationship is
+*Hibernate:JPA :: KAUT:OKF* — KAUT IMPLEMENTS the format and EXTENDS it with the verifiable
+freshness/trust machinery the format alone cannot provide. Two conformance surfaces:
 
-### 22. `type` — the one OKF-required field (OPTIONAL here, == the layer)
+- **In place** — the store itself meets OKF's hard conformance bar (every concept doc: parseable
+  frontmatter + a non-empty `type`): the serializer stamps `type:` on every engine write (§22), and
+  `kaut okf check` / `kaut okf stamp` audit and backfill legacy docs (stamp goes through the write
+  gate like any rewrite). One disclosed deviation: the native `sources` key keeps KAUT's typed-string
+  shape rather than OKF v0.2's recommended entry mappings — the restricted frontmatter grammar (§3)
+  deliberately has no nested mappings, and OKF classes the provenance shape as soft guidance
+  (consumers MUST NOT reject over it). The idiomatic shape is produced on export.
+- **Export** — `kaut okf export --out <dir>` projects the store's committed HEAD into a fully
+  idiomatic OKF v0.2 bundle: OKF-shaped `sources` entries (`- resource: <typed source>` — the typed
+  string is a valid scope descriptor), `generated: {by, at}` derived from the `engine` field
+  (`producer/version` actor form) + the doc's last store commit, `verified:` events recovered from
+  `[owner-approved: …]` commit subjects (owner-gate landings surface as OKF **human-reviewed** tier:
+  `by: human:<author>`), a bundle-root `index.md` carrying `okf_version: "0.2"`, and a `log.md`
+  projected from store history. Bodies are exported verbatim; all KAUT-native keys ride along as
+  OKF-protected extension keys.
+
+### 22. `type` — the one OKF-required field (== the layer; stamped on every engine write)
 
 ```
-type: <layer>          # OPTIONAL. == the doc's layer = first segment of its id (its directory)
+type: <layer>          # == the doc's layer = first segment of its id (its directory)
 ```
 
-- OKF requires every concept to carry a `type`. KAUT's layer dir already IS that type, so `type` is
-  **derivable from the path** (store-discipline litmus → not forced into stored docs): a doc that omits
-  `type:` is read AS `typeForId(id)` = `id.split('/')[0]`. Pre-0.3.x docs are never rewritten.
-- When **present**, `type` MUST equal the layer (`domains/x` with `type: decisions` is invalid — caught
-  by `validateDoc`, listed under `Invalid`, never silently accepted).
-- **Engine-generated docs stamp it** for in-place external conformance: `map/*` (`route-map`,
-  `pkg-graph`, `compose-map`) emit `type: map`. Serialization places `type` right after `id`.
+- OKF requires every concept to carry a `type`. KAUT's layer dir already IS that type, so on READ a
+  doc that omits `type:` is still accepted AS `typeForId(id)` = `id.split('/')[0]` (pre-0.8.x docs
+  are never force-rewritten; `kaut okf stamp` backfills them through the normal write gate).
+- On WRITE (engine 0.8.x+) the serializer chokepoint injects `type` whenever `id` is present — every
+  doc the engine writes physically carries it, satisfying OKF's bundle conformance in place.
+- When **present**, `type` MUST equal the layer (`domains/x` with `type: decisions` is invalid —
+  caught by `validateDoc`, listed under `Invalid`, never silently accepted). Serialization places
+  `type` right after `id`.
 - OKF reader rules KAUT already satisfies as a **consumer**: unknown frontmatter keys are preserved,
   not rejected (§2 tolerant reader); a `broken` source / `Gaps` entry models OKF's "broken link =
   not-yet-written", which consumers must tolerate.
 
-### 23. KAUT's required fields ride as OKF extensions (the moat)
+### 23. The v0.2 field mapping — native keys as protected extensions (the moat)
 
-OKF v0.1 has no freshness/trust/provenance/validation (explicitly out of scope) and **normatively
-protects extension keys** ("producers MAY include additional keys; consumers SHOULD preserve unknown
-keys… SHOULD NOT reject"). So KAUT's `trust` / `derived_from_commit` / typed `sources` / `engine` /
-`checks` / `schema_version` / `disputed` are all valid OKF extensions; OKF's recommended
-`title`/`resource`/`timestamp` are subsumed by our `title` / typed `sources` (superset of `resource`) /
-`harvested` (+ the verifiable `derived_from_commit`). Identity stays in the engine — OKF is the
-portability surface, not the identity. Import/export adapters (`kaut okf …`) are deferred to a driver
-(B7-β); this section is the in-place producer surface (B7-α).
+| OKF v0.2 | KAUT native | export projection |
+|---|---|---|
+| `type` (required) | layer dir / `type` | stamped (== layer) |
+| `title` | `title` (required here) | as-is |
+| `description` | — (body first line) | derived single line |
+| `sources[].resource` | typed `sources` strings | `- resource: <typed string>` per entry |
+| `generated.by` / `.at` | `engine` + store git | `manual@0.2.1` → `manual/0.2.1`; last doc commit datetime |
+| `verified[]` | the owner gate (§24) | `[owner-approved:]` commits → `by: human:<author>`, `at:` |
+| trust tiers (derived) | `trust` T0–T4 | tier falls out of `verified`; T-grades ride as extension |
+| `status` / `stale_after` | draft queue / computed staleness | omitted — KAUT does not stamp staleness, it COMPUTES it |
+
+OKF v0.2 stamps trust/lifecycle as *declarations* (`generated`, `verified`, `stale_after`); KAUT's
+extensions make them *verifiable*: `derived_from_commit` + typed `sources` let the engine compute
+freshness against the source tree on every read — a format can record a timestamp, it cannot check
+one. That is the extension surface: `trust` / `derived_from_commit` / typed `sources` / `engine` /
+`checks` / `schema_version` / `disputed` are all OKF-legal unknown keys ("producers MAY include any
+additional keys; consumers … MUST NOT reject"), preserved by any conformant consumer. Import of
+foreign OKF bundles remains out of scope (no driver); the export surface + in-place bar above are
+what "KAUT implements OKF" means normatively here.
 
 ## Write grants — the layered promotion gate (schema_version 1, additive — engine 0.3.x)
 

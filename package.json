@@ -1,6 +1,6 @@
 {
     "name": "kaut",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "KAUT (Knowledge Actualization Under Trust) — self-maintaining, source-bound, freshness-checked project knowledge for AI agents",
     "license": "Apache-2.0",
     "author": "Yuriy Orlov <yuriy.orlov@undertrust.dev> (https://github.com/yurgeno)",

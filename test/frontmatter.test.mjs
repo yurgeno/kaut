@@ -33,11 +33,12 @@ test('parses a contract-shaped document', () => {
     assert.match(body, /## Pointers/)
 })
 
-test('round-trip: parse → serialize → parse yields identical fields and body', () => {
+test('round-trip: parse → serialize → parse yields identical fields and body (+ the injected OKF type)', () => {
     const p1 = parseFrontmatter(DOC)
     const out = serializeFrontmatter(p1.fields, p1.body, p1.order)
     const p2 = parseFrontmatter(out)
-    assert.deepEqual(p2.fields, p1.fields)
+    // the serialization chokepoint back-fills `type` (== the id's layer) on any doc that omits it
+    assert.deepEqual(p2.fields, { ...p1.fields, type: 'domains' })
     assert.equal(p2.body, p1.body)
     // Serialization is stable: a second round-trip is byte-identical.
     assert.equal(serializeFrontmatter(p2.fields, p2.body, p2.order), out)

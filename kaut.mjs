@@ -13,6 +13,7 @@
  *     draft       queue a doc update for asynchronous owner review
  *     review      owner side of the draft queue (list/diff/--approve/--reject)
  *     touched     which docs bind the given changed files (change-site sensor)
+ *     okf         OKF v0.2 bundle surface: check conformance, stamp missing types, export
  *     digest      aggregate journal telemetry across workspace stores
  *     map         regenerate the L0 maps (adapter collectors)
  *     workspace   init/list multi-repo workspaces from a conductor manifest
@@ -37,6 +38,7 @@ import { filterMatch } from './lib/glob.mjs'
 import { parseFrontmatter } from './lib/frontmatter.mjs'
 import { createContext, resolveAnchor, staleAll, verdictForDoc, VERDICT } from './lib/stale.mjs'
 import { buildRefresh, REFRESH } from './lib/refresh.mjs'
+import { checkBundle, exportBundle, stampTypes } from './lib/okf.mjs'
 import { draftPath, listDrafts, promoteDraft, removeDraft } from './lib/drafts.mjs'
 import { BACKUPS_DIR, packHome, parseArchive, restoreEntries } from './lib/backup.mjs'
 import { altitudeFor } from './lib/altitude.mjs'
@@ -968,6 +970,59 @@ function cmdTouched(d, { log, json }, files) {
 }
 
 /**
+ * `kaut okf <check|stamp|export>` — the OKF v0.2 (Open Knowledge Format) bundle surface.
+ *   check                 in-place conformance report; exit 0 only when fully conformant
+ *   stamp                 backfill missing `type:` lines and land through the write gate
+ *   export --out <dir>    project the store's HEAD into a standalone conformant bundle
+ * `check` and `export` are read-only (no lock; export reads committed content only). `stamp`
+ * rewrites docs under the lock and commits through the ordinary chokepoint, so owner-gated
+ * layers need `--approve`; the grant pre-flight runs BEFORE any rewrite (mirrors `index`) so
+ * a refusal leaves the store byte-clean.
+ * @param {ReturnType<typeof discover>} d
+ * @param {{log: (s: string) => void, approve?: boolean}} opts
+ * @param {string[]} rest subcommand
+ * @param {{out?: string, force: boolean}} flags
+ */
+async function cmdOkf(d, { log, approve = false }, rest, { out, force }) {
+    requireStore(d)
+    const sub = rest[0]
+    if (sub === 'check') {
+        const { concepts, missingType, invalid } = checkBundle(d.root)
+        log(`okf check: ${concepts} concept docs, ${missingType.length} missing type, ${invalid.length} invalid`)
+        for (const id of missingType) log(`  missing type: ${id}`)
+        for (const inv of invalid) log(`  invalid: ${inv.path} — ${inv.errors.join('; ')}`)
+        if (missingType.length || invalid.length)
+            throw new ValidationError('store is not OKF-conformant — "kaut okf stamp" backfills missing types')
+        log('okf check: conformant (okf 0.2)')
+        return
+    }
+    if (sub === 'stamp') {
+        const release = await acquireLock(d.root, 'okf-stamp')
+        try {
+            const targets = stampTypes(d.root, { dryRun: true })
+            if (!targets.length) {
+                log('okf stamp: nothing to stamp')
+                return
+            }
+            enforceGrants(d.root, targets.map((id) => `${id}.md`), { approve }) // pre-flight, pre-rewrite
+            const stamped = stampTypes(d.root)
+            commitAll(d.root, `kaut: okf-stamp (${stamped.join(', ')})`, { approve })
+            log(`okf stamp: type backfilled on ${stamped.length} doc(s): ${stamped.join(', ')}`)
+        } finally {
+            release()
+        }
+        return
+    }
+    if (sub === 'export') {
+        const target = out ?? path.join(process.cwd(), 'okf-export', path.basename(d.root))
+        const { count, dir } = exportBundle(d.root, target, { force })
+        log(`okf export: ${count} concepts -> ${dir} (okf 0.2)`)
+        return
+    }
+    throw new ValidationError('usage: kaut okf <check|stamp|export> [--out <dir>] [--force] [--approve]')
+}
+
+/**
  * `kaut map` — regenerate the L0 maps under the write lock and commit once.
  * Route-map drift (D12) aborts before any write (exit 1, nothing changed).
  * @param {ReturnType<typeof discover>} d
@@ -1267,7 +1322,7 @@ function storeConfig(root) {
 }
 
 const USAGE =
-    'usage: kaut.mjs <setup|bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|digest|map|workspace|backup|restore|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--data <dir>] [--repos all|names] [--scan <dir>] [--bootstrap|--no-bootstrap] [--yes] [--force] [--dry-run] [--json] [--quiet]'
+    'usage: kaut.mjs <setup|bootstrap|index|doctor|stale|lookup|note|refresh|draft|review|touched|okf|digest|map|workspace|backup|restore|home|paths> [<id>…] [--manifest <path>] [--workspace <name>] [--since <ISO-date>] [--note <text>] [--approve] [--reject] [--data <dir>] [--repos all|names] [--scan <dir>] [--out <dir>] [--bootstrap|--no-bootstrap] [--yes] [--force] [--dry-run] [--json] [--quiet]'
 
 /**
  * `kaut home [<dir>]` — show or set the knowledge-data home. This is the engine's own
@@ -1476,6 +1531,7 @@ async function main() {
             data: { type: 'string' },
             repos: { type: 'string' },
             scan: { type: 'string' },
+            out: { type: 'string' },
             bootstrap: { type: 'boolean', default: false },
             'no-bootstrap': { type: 'boolean', default: false },
             yes: { type: 'boolean', default: false },
@@ -1551,6 +1607,9 @@ async function main() {
             break
         case 'touched':
             cmdTouched(d, opts, rest)
+            break
+        case 'okf':
+            await cmdOkf(d, opts, rest, { out: values.out, force: values.force })
             break
         case 'map':
             await cmdMap(d, opts)
