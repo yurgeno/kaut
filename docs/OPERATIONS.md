@@ -72,7 +72,7 @@ The project repository needs no cleanup — it was never modified.
 ## Development
 
 ```bash
-cd <engine> && node --test          # 160 tests, zero deps (node:test)
+cd <engine> && node --test          # 213 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24
@@ -90,5 +90,5 @@ gate) · `lib/drafts.mjs` (draft queue) · `lib/lock.mjs` (mkdir lock) · `lib/g
 (store git + commit chokepoint) · `lib/indexgen.mjs` (INDEX renderer + doc validation).
 
 Versioning: `VERSION` file (mirrored in `package.json`); facts record provenance as
-`<collector>@<engine-version>` (`route-map@0.5.0`, `pkg-graph@0.5.0` for the L0 maps).
+`<collector>@<engine-version>` (`route-map@0.8.0`, `pkg-graph@0.8.0` for the L0 maps).
 Data-contract changes must be additive (see [SCHEMA.md](../SCHEMA.md) preamble).

@@ -23,7 +23,7 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.8.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.8.1 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
@@ -249,6 +249,7 @@ automatically and silently.
 Run from anywhere inside a project git repository:
 
 ```bash
+node <engine>/kaut.mjs setup         # guided install: data home, sibling-repo scan, bootstrap (run once, from anywhere)
 node <engine>/kaut.mjs bootstrap     # create/repair the project's knowledge store (idempotent)
 node <engine>/kaut.mjs index         # regenerate INDEX.md (under lock; auto-commits changes)
 node <engine>/kaut.mjs doctor        # integrity checks; exit 0 = healthy
@@ -339,7 +340,7 @@ nothing.
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 204 tests, zero deps (node:test)
+cd <engine> && node --test          # 213 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24

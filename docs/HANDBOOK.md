@@ -457,9 +457,9 @@ Design is frozen (v1.0); building follows phases, each opened only by **journal 
 the previous one — never by enthusiasm. The detailed gate records, phase plans, and roadmap are
 development-process documents and live in the maintainers' private hub, not in this repo.
 
-Current release: **v0.8.0** (2026-08-27 — OKF v0.2 conformance: `okf check|stamp|export`; previously stack adapters with auto-detection + backup/restore + the guided install: `kaut setup` with sibling-repo
+Current release: **v0.8.1** (2026-08-27 — OKF v0.2 conformance: `okf check|stamp|export`; previously stack adapters with auto-detection + backup/restore + the guided install: `kaut setup` with sibling-repo
 scanning and the persistent data-home redirect, on top of v0.4.0's maintenance loop, MCP
-server, security hardening, and packaging). Suite: **211 tests**
+server, security hardening, and packaging). Suite: **213 tests**
 (bare `node --test`; do not pass the test directory — that form fails on Node ≥ 24).
 
 | Phase | Delivers | Status |

@@ -90,3 +90,26 @@ test('setup: unknown repo selection is refused with a clear error', () => {
         /unknown repository selection "nope"/,
     )
 })
+
+test('setup with env KAUT_HOME: the global redirect is NOT rewritten (env-isolated runs stay isolated)', () => {
+    const { scanDir, env } = fixture()
+    const kautHome = makeTmpDir()
+    const dataDir = path.join(scanDir, 'kaut-data')
+    const out = run(
+        ['setup', '--scan', scanDir, '--data', dataDir, '--repos', 'repo-one', '--bootstrap', '--yes'],
+        { ...env, KAUT_HOME: kautHome },
+    )
+    // no redirect written into the anchor — env outranks it for every resolution anyway
+    assert.equal(existsSync(path.join(env.HOME, '.kaut', 'config.json')), false)
+    // the store landed where the process actually resolves the home: KAUT_HOME
+    assert.equal(readdirSync(kautHome).filter((n) => n.startsWith('repo-one--')).length, 1)
+    assert.match(out, /NOT persisted/)
+})
+
+test('home <dir> with env KAUT_HOME: refuses to persist and says why', () => {
+    const { env } = fixture()
+    const kautHome = makeTmpDir()
+    const out = run(['home', makeTmpDir()], { ...env, KAUT_HOME: kautHome })
+    assert.equal(existsSync(path.join(env.HOME, '.kaut', 'config.json')), false)
+    assert.match(out, /KAUT_HOME is set/)
+})

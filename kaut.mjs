@@ -1336,6 +1336,10 @@ function setDataHome(dir) {
     const cfgPath = path.join(kautAnchor(), 'config.json')
     const root = path.resolve(dir)
     mkdirSync(root, { recursive: true }) // instance data folder — create, never delete
+    // Env KAUT_HOME outranks the redirect for every resolution this process makes, so
+    // persisting one here would only rewrite the operator's GLOBAL config from an
+    // env-isolated run (tests, CI, one-off overrides) that then ignores it. Skip.
+    if (process.env.KAUT_HOME) return { root, cfgPath: null }
     mkdirSync(kautAnchor(), { recursive: true })
     let cfg = {}
     try {
@@ -1355,8 +1359,9 @@ function cmdHome({ log }, dir) {
         log(`${kautHome()} (${source})`)
         return
     }
-    const { root } = setDataHome(dir)
-    log(`knowledge-data home set: ${root} (redirect: ${cfgPath})`)
+    const { root, cfgPath: persisted } = setDataHome(dir)
+    if (persisted) log(`knowledge-data home set: ${root} (redirect: ${persisted})`)
+    else log(`KAUT_HOME is set (${process.env.KAUT_HOME}) — it outranks the redirect, so nothing was persisted; unset KAUT_HOME to set a durable data home`)
 }
 
 
@@ -1389,8 +1394,9 @@ async function cmdSetup({ log }, flags) {
         const currentHome = kautHome()
         const dataDflt = flags.data || (currentHome !== kautAnchor() ? currentHome : path.join(scanDir, 'kaut-data'))
         const dataDir = flags.data || (await ask('Knowledge data folder (LIVE data — never deleted by the engine)', dataDflt))
-        const { root: dataRoot } = setDataHome(dataDir)
-        log(`data home: ${dataRoot} (persisted — every kaut command and the MCP server resolve it themselves)`)
+        const { root: dataRoot, cfgPath: persistedCfg } = setDataHome(dataDir)
+        if (persistedCfg) log(`data home: ${dataRoot} (persisted — every kaut command and the MCP server resolve it themselves)`)
+        else log(`data home NOT persisted: env KAUT_HOME (${process.env.KAUT_HOME}) overrides the redirect and stores will land there — unset KAUT_HOME for a durable setup`)
 
         // 2. Which sibling repositories to serve. The engine clone is expected NEXT TO
         //    the project repos; anything with a .git that is not the engine or the data

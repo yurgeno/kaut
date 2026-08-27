@@ -20,7 +20,7 @@ throwaway git repos), so the suite runs from any checkout and leaves nothing beh
 
 Run the bare `node --test` from the repository root — do **not** pass the test
 directory as an argument (on newer Node that form fails to resolve the suite). The
-suite is currently **162 tests**, all on `node:test`, and it stays green: a PR that
+suite is currently **213 tests**, all on `node:test`, and it stays green: a PR that
 turns any of them red is not ready.
 
 ## Ground rules

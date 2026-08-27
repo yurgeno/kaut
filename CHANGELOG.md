@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.1 — 2026-08-27
+
+- Fix: `setup` / `home` no longer rewrite the operator's global data-home redirect when
+  env `KAUT_HOME` is set — an env-isolated run (tests, CI, one-off overrides) previously
+  persisted a redirect it then ignored, silently repointing the durable config. Now the
+  redirect write is skipped with an honest message; stores land where the environment
+  actually resolves them.
+- `okf export`: `verified.by` is always the operator's identity — store commits are
+  authored under the engine's git identity, so the commit author is deliberately ignored
+  when reconstructing the human verification events.
+- Docs: stale suite counts and the docs index brought current; `setup` added to the
+  README command block.
+- Suite: 211 → 213 tests.
+
 ## 0.8.0 — 2026-08-27
 
 OKF v0.2 conformance — KAUT is an implementation of the vendor-neutral
