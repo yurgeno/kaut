@@ -312,8 +312,8 @@ near-nothing: freshness checks are pure git comparisons — no AI calls involved
 
 ## Learn more
 
-- **The project wiki** — Getting Started, Connecting Your Project, Core Concepts, the
-  Maintenance Loop, FAQ and Troubleshooting in guided form
+- [**The project wiki**](https://github.com/yurgeno/kaut/wiki) — Getting Started, Connecting
+  Your Project, Core Concepts, the Maintenance Loop, FAQ and Troubleshooting in guided form
 - [docs/HANDBOOK.md](docs/HANDBOOK.md) — how it all works, in human language but in full detail
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — operator reference: on-disk layout, resolution,
   tamper containment, write gate, engine internals
