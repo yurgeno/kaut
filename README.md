@@ -23,7 +23,7 @@ orchestrator, no framework, no services, no accounts, nothing else to deploy. It
 with the sibling [TAUT](https://github.com/yurgeno/taut) orchestration framework (TAUT drives
 agents, KAUT is what they know) — but that integration is optional, not a dependency.
 
-**Status: v0.8.1 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
+**Status: v0.9.0 — the full loop is live.** Reading: `lookup` (one-call ready answer) with
 freshness verdicts (merge-base-anchored, never crying "fresh" when unsure), trust tiers, and
 the `altitude` coverage band; tamper containment withholds anything edited outside the
 pipeline. Multi-repo: workspace registry, per-member stores, one system store anchored to a
@@ -248,7 +248,10 @@ accordingly (existing configs are never touched; every knob stays overridable):
 | Vue (incl. monorepo) | `vue` dep / `src/router/routes.ts` | route table + package import graph |
 | Java / Kotlin + Spring | Gradle/Maven build root (top or nested one level) + controller annotations | `@RequestMapping`-family route table + module graph |
 | Next.js | `next` dep / `app`·`pages` trees | file-based route table (App + Pages router) |
-| Express / Nest / FastAPI / Flask | deps in package.json / requirements / pyproject | lexical METHOD-path route table |
+| Express / Nest | deps in package.json | lexical METHOD-path route table |
+| Python — any project | a dependency manifest or lock file (`pyproject.toml`, `requirements*.txt`, `setup.py` / `setup.cfg`, `Pipfile`, `environment.yml`, `uv.lock` / `poetry.lock` / `pdm.lock`) — or plain `*.py` scripts with no manifest at all | package & script map: top-level packages with their import graph, scripts, declared entry points |
+| Python web frameworks | framework named in the manifests (or `manage.py`): FastAPI, Starlette, Flask, Quart, Django, Django REST Framework, Django Ninja, aiohttp, Sanic, Litestar, Tornado, Bottle, Falcon, Pyramid | lexical METHOD-path route table |
+| Python migrations (Alembic / Django) | `versions/*.py` carrying `revision =` · `<app>/migrations/NNNN_*.py` | migration inventory (Alembic revisions ordered along the `down_revision` chain, Django numbering per app) |
 | PHP (Laravel / Symfony) | `composer.json` | `Route::…` / `#[Route]` route table |
 | SQL migrations (Flyway-style) | `V*__*.sql` files | migration inventory (count, versions) |
 | docker-compose landscape | `docker-compose.yml` | service map |
@@ -257,6 +260,32 @@ A repo with no recognizable stack gets an empty map layer and everything else wo
 same. The lexical collectors are honest best-effort scans, marked as such in the generated
 doc. Adapters for further stacks are deliberately small modules — see
 [CONTRIBUTING.md](CONTRIBUTING.md) if yours is missing.
+
+### Python support — what it works with
+
+Everything below is detected and mapped by deterministic file scans; KAUT never runs
+`python`, `pip`, or a migration tool.
+
+- **Project shapes:** packaged projects (`src/` layout or flat packages with
+  `__init__.py`), Django sites (`manage.py`, apps with `apps.py`), and plain script
+  repositories (`*.py` at the root or under `scripts/` / `bin/`, no manifest needed).
+- **Manifests and package managers (detection):** `pyproject.toml` (PEP 621, Poetry, PDM,
+  uv, Hatch), `requirements.txt` + `requirements-*.txt` + `requirements/*.txt` (pip),
+  `setup.py` / `setup.cfg` (setuptools), `Pipfile` / `Pipfile.lock` (Pipenv),
+  `environment.yml` (Conda), `uv.lock` / `poetry.lock` / `pdm.lock`.
+- **Web frameworks (route map, `httproutes`):** FastAPI (incl. `APIRouter`), Starlette
+  (`Route` / `Mount`), Flask (incl. Blueprints and Flask-RESTX namespaces), Quart, Django
+  (`urls.py`: `path` / `re_path` / `url`, `include`), Django REST Framework
+  (`router.register`), Django Ninja, aiohttp (`add_get` / `web.get` / `add_route` /
+  `RouteTableDef`), Sanic, Litestar, Tornado (handler tuples), Bottle, Falcon
+  (`add_route`), Pyramid (`add_route`). A framework extension or plugin named in the
+  manifest (`flask-restx`, `pytest-django`) counts for its framework.
+- **Migrations (`sqlmigrations`):** Alembic (`versions/*.py`, chain-ordered) and Django
+  (`<app>/migrations/NNNN_*.py`), alongside Flyway-style SQL.
+- **Package & script map (`pymap` → `map/packages`):** top-level packages and their
+  intra-repo import graph (weighted), scripts with an `if __name__ == "__main__"` flag,
+  entry points from `[project.scripts]` / `[project.gui-scripts]` /
+  `[tool.poetry.scripts]` and setup.cfg `console_scripts`.
 
 ## Wiring your agents — the step that makes it real
 
@@ -391,7 +420,7 @@ nothing.
 ## Tests
 
 ```bash
-cd <engine> && node --test          # 213 tests, zero deps (node:test)
+cd <engine> && node --test          # 225 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24

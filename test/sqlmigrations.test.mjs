@@ -58,3 +58,43 @@ test('collectMigrations: fallback population — *.sql under migration* dirs, no
 test('buildSqlMigrations: a repo without migrations throws the absence error', () => {
     assert.throws(() => buildSqlMigrations(makeGitRepo(), META), SqlMigrationsError)
 })
+
+test('collectMigrations: django per-app numbering and alembic chain order, coexisting with flyway', () => {
+    const repo = makeGitRepo()
+    writeRepoFile(repo, 'shop/migrations/0001_initial.py', 'from django.db import migrations\n')
+    writeRepoFile(repo, 'shop/migrations/0002_add_sku.py', 'from django.db import migrations\n')
+    writeRepoFile(repo, 'shop/migrations/__init__.py', '')
+    writeRepoFile(repo, 'blog/migrations/0001_initial.py', 'from django.db import migrations\n')
+    writeRepoFile(repo, 'alembic/versions/a1b2_init.py', 'revision = "a1b2"\ndown_revision = None\n')
+    writeRepoFile(repo, 'alembic/versions/c3d4_users.py', "revision: str = 'c3d4'\ndown_revision: Union[str, None] = 'a1b2'\n")
+    writeRepoFile(repo, 'alembic/versions/e5f6_orders.py', 'revision = "e5f6"\ndown_revision = "c3d4"\n')
+    writeRepoFile(repo, 'alembic/env.py', 'from alembic import context\n') // not under versions/
+    writeRepoFile(repo, 'db/V1__init.sql', 'create table t (id int);\n')
+    commit(repo, 'mixed migrations')
+
+    const coll = collectMigrations(repo)
+    assert.deepEqual(coll.families, ['flyway', 'django', 'alembic'])
+    assert.equal(coll.population, 'flyway+django+alembic')
+    const alembic = coll.entries.filter((e) => e.family === 'alembic')
+    assert.deepEqual(alembic.map((e) => [e.versionText, e.version[0]]), [['a1b2', 1], ['c3d4', 2], ['e5f6', 3]])
+    const django = coll.entries.filter((e) => e.family === 'django')
+    assert.deepEqual(django.map((e) => e.versionText), ['blog:0001', 'shop:0001', 'shop:0002'])
+
+    const { content, migrationCount } = buildSqlMigrations(repo, META)
+    assert.equal(migrationCount, 7)
+    assert.match(content, /7 migrations total: 1 flyway \(Flyway V\*__\*\.sql naming\); 3 django/)
+    assert.match(content, /file-glob:\*\*\/migrations\/\?\?\?\?_\*\.py/)
+    assert.match(content, /file-glob:\*\*\/versions\/\*\.py/)
+    assert.match(content, /### django\n[\s\S]*\| blog:0001 \| initial \| blog\/migrations\/0001_initial\.py \|\n\| shop:0002 \| add_sku \|/) // per app, newest first
+    assert.match(content, /### alembic\n[\s\S]*\| e5f6 \| orders \|[\s\S]*\| a1b2 \| init \|/) // head first
+})
+
+test('collectMigrations: an alembic set with a broken chain keeps the entries, unordered', () => {
+    const repo = makeGitRepo()
+    writeRepoFile(repo, 'migrations/versions/x1_one.py', 'revision = "x1"\ndown_revision = "missing"\n')
+    writeRepoFile(repo, 'migrations/versions/x2_two.py', 'revision = "x2"\ndown_revision = "x1"\n')
+    commit(repo, 'broken chain')
+    const coll = collectMigrations(repo)
+    assert.deepEqual(coll.families, ['alembic'])
+    assert.deepEqual(coll.entries.map((e) => [e.versionText, e.version]), [['x1', null], ['x2', null]])
+})

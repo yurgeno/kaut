@@ -99,3 +99,76 @@ test('buildHttpRoutes: a repo without route registrations throws the absence err
     commit(repo, 'no routes')
     assert.throws(() => buildHttpRoutes(repo, META), HttpRoutesError)
 })
+
+const PY_FAMILIES_SRC = [
+    'from litestar import get',
+    'from aiohttp import web',
+    'from starlette.routing import Route, Mount',
+    '',
+    '@get("/lit")',
+    'async def lit(): ...',
+    '',
+    '@route("/bottle", method="POST")',
+    'def bottle_handler(): ...',
+    '',
+    '@api.get("/ninja")',
+    'def ninja(request): ...',
+    '',
+    '@bp.route("/single", method="PUT")',
+    'def single(): ...',
+    '',
+    'app.router.add_get("/aio", handler)',
+    'app.add_routes([web.post("/aio", handler)])',
+    'app.router.add_route("*", "/any", handler)',
+    'falcon_app.add_route("/things", ThingsResource())',
+    'config.add_route("home", "/pyramid")',
+    'routes = [Route("/st", endpoint=home, methods=["GET", "HEAD"]), Mount("/static", app=files)]',
+    '    (r"/tornado", MainHandler),',
+    'path("not-urls-file/", view)  # decoy: django path() outside urls.py',
+    '',
+].join('\n')
+
+const DJANGO_URLS_SRC = [
+    'from django.urls import include, path, re_path',
+    'from rest_framework import routers',
+    'router = routers.DefaultRouter()',
+    'router.register(r"users", UserViewSet)',
+    'urlpatterns = [',
+    '    path("", views.index),',
+    '    path("articles/<int:year>/", views.year_archive),',
+    '    re_path(r"^legacy/(?P<id>\\d+)/$", views.legacy),',
+    '    path("api/", include("api.urls")),',
+    '    path("api/", include(router.urls)),',
+    ']',
+    '',
+].join('\n')
+
+test('scanHttpFile: python families — litestar/bottle bare decorators, ninja, aiohttp, falcon/pyramid, starlette, tornado; django decoy outside urls.py', () => {
+    const rows = scanHttpFile(PY_FAMILIES_SRC, 'svc/app.py').map((r) => [r.method, r.path])
+    assert.deepEqual(rows, [
+        ['GET', '/lit'],
+        ['POST', '/bottle'],
+        ['GET', '/ninja'],
+        ['PUT', '/single'],
+        ['GET', '/aio'],
+        ['POST', '/aio'],
+        ['ANY', '/any'],
+        ['ANY', '/things'],
+        ['ANY', '/pyramid'],
+        ['GET', '/st'],
+        ['HEAD', '/st'],
+        ['ANY', '/tornado'],
+    ])
+})
+
+test('scanHttpFile: django urls.py — path/re_path with ^$ stripped, include → INCLUDE, DRF register → VIEWSET', () => {
+    const rows = scanHttpFile(DJANGO_URLS_SRC, 'site/urls.py').map((r) => [r.method, r.path, r.at])
+    assert.deepEqual(rows, [
+        ['VIEWSET', '/users', 'site/urls.py:4'],
+        ['ANY', '/', 'site/urls.py:6'],
+        ['ANY', '/articles/<int:year>/', 'site/urls.py:7'],
+        ['ANY', '/legacy/(?P<id>\\d+)/', 'site/urls.py:8'],
+        ['INCLUDE', '/api/', 'site/urls.py:9'],
+        ['INCLUDE', '/api/', 'site/urls.py:10'],
+    ])
+})

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — 2026-09-03
+
+Python support across bootstrap and the map layer (the full list of what it works with:
+README → *Python support*).
+
+- Stack detection: a Python project is recognized by any common manifest or lock file
+  (`pyproject.toml`, `requirements*.txt` incl. `requirements/*.txt`, `setup.py`,
+  `setup.cfg`, `Pipfile`, `environment.yml`, `uv.lock` / `poetry.lock` / `pdm.lock`) —
+  and a plain-script repository (`*.py` at the root, `scripts/`, `bin/`) with no manifest
+  at all. Previously only FastAPI/Flask projects were seen.
+- New collector `pymap` → `map/packages`: top-level packages (root or `src/` layout,
+  Django apps marked) with their intra-repo import graph, scripts with a `__main__` flag,
+  entry points from pyproject / setup.cfg. Seeded for every Python repo.
+- `httproutes` learns the Python route idioms of FastAPI, Starlette, Flask, Quart, Django
+  (`urls.py` only, `include` → INCLUDE), Django REST Framework (`router.register` →
+  VIEWSET), Django Ninja, aiohttp, Sanic, Litestar, Tornado, Bottle, Falcon, Pyramid;
+  detection names each framework found in the manifests (extensions such as `flask-restx`
+  count for their framework).
+- `sqlmigrations` gains two Python populations next to Flyway/SQL: Django
+  (`<app>/migrations/NNNN_*.py`, numbered per app) and Alembic (`versions/*.py`, ordered
+  along the `down_revision` chain when intact). The doc now renders one table per family.
+- Bootstrap distinguishes "stack detected, no map collector applies" from "no known
+  stack".
+- Suite: 213 → 225 tests.
+
 ## 0.8.1 — 2026-08-27
 
 - Fix: `setup` / `home` no longer rewrite the operator's global data-home redirect when

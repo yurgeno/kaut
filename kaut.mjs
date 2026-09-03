@@ -50,6 +50,7 @@ import { buildPackageGraph } from './lib/pkggraph.mjs'
 import { buildComposeMap, ComposeMapError } from './lib/composemap.mjs'
 import { buildSpringMap, SpringMapError } from './lib/springmap.mjs'
 import { buildJvmGraph, JvmGraphError } from './lib/jvmgraph.mjs'
+import { buildPyMap, PyMapError } from './lib/pymap.mjs'
 import { buildSqlMigrations, SqlMigrationsError } from './lib/sqlmigrations.mjs'
 import { buildNextRoutes, NextRoutesError } from './lib/nextroutes.mjs'
 import { buildHttpRoutes, HttpRoutesError } from './lib/httproutes.mjs'
@@ -208,7 +209,9 @@ async function cmdBootstrap(d, { dryRun, log, approve = false }) {
             log(
                 det.collectors.length
                     ? `map collectors detected: ${det.stack.join(', ')} → ${det.collectors.join(', ')}`
-                    : 'map: no known stack detected — map.collectors: []',
+                    : det.stack.length
+                      ? `stack detected: ${det.stack.join(', ')} — no map collectors apply (map.collectors: [])`
+                      : 'map: no known stack detected — map.collectors: []',
             )
         })
         for (const dir of STORE_DIRS)
@@ -1106,6 +1109,18 @@ async function cmdMap(d, { dryRun, log, approve = false }) {
                 throw e
             }
             outputs.push({ rel: path.join('map', 'packages.md'), content: jg.content, topic: 'map/packages', label: `${jg.moduleCount} modules` })
+        } else if (name === 'pymap') {
+            let pm
+            try {
+                pm = buildPyMap(fr.repo, meta)
+            } catch (e) {
+                if (e instanceof PyMapError) {
+                    log(`map: pymap skipped — ${e.message}`)
+                    continue
+                }
+                throw e
+            }
+            outputs.push({ rel: path.join('map', 'packages.md'), content: pm.content, topic: 'map/packages', label: `${pm.packageCount} packages, ${pm.scriptCount} scripts` })
         } else if (name === 'sqlmigrations') {
             let sq
             try {

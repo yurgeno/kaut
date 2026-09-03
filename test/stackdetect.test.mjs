@@ -74,7 +74,7 @@ test('detectCollectors: sql migrations, http backends (js deps + python manifest
     const py = makeGitRepo()
     writeRepoFile(py, 'requirements.txt', 'fastapi==0.110.0\nuvicorn\n')
     commit(py, 'python fixture')
-    assert.deepEqual(detectCollectors(py), { collectors: ['httproutes'], stack: ['fastapi'] })
+    assert.deepEqual(detectCollectors(py), { collectors: ['pymap', 'httproutes'], stack: ['python', 'fastapi'] })
 
     const php = makeGitRepo()
     writeRepoFile(php, 'composer.json', JSON.stringify({ require: { 'laravel/framework': '^11.0' } }))
@@ -85,6 +85,80 @@ test('detectCollectors: sql migrations, http backends (js deps + python manifest
     writeRepoFile(compose, 'docker-compose.yml', 'services:\n  web:\n    image: demo:latest\n')
     commit(compose, 'compose fixture')
     assert.deepEqual(detectCollectors(compose), { collectors: ['composemap'], stack: ['compose'] })
+})
+
+test('detectCollectors: python — manifests, frameworks, migrations, scripts-only', () => {
+    // Django + DRF via requirements-dev.txt and manage.py; django migrations; no web dep in requirements.txt
+    const dj = makeGitRepo()
+    writeRepoFile(dj, 'requirements.txt', 'psycopg[binary]\n')
+    writeRepoFile(dj, 'requirements-dev.txt', 'Django>=5.0\ndjangorestframework\npytest-django\n')
+    writeRepoFile(dj, 'manage.py', '#!/usr/bin/env python\n')
+    writeRepoFile(dj, 'shop/migrations/0001_initial.py', 'from django.db import migrations\n')
+    commit(dj, 'django fixture')
+    assert.deepEqual(detectCollectors(dj), {
+        collectors: ['pymap', 'sqlmigrations', 'httproutes'],
+        stack: ['python', 'django', 'drf', 'django-migrations'],
+    })
+
+    // Poetry pyproject with aiohttp + alembic versions; a pip-style requirements/ dir with litestar
+    const poetry = makeGitRepo()
+    writeRepoFile(poetry, 'pyproject.toml', '[tool.poetry.dependencies]\npython = "^3.12"\naiohttp = "^3.9"\nalembic = "*"\n')
+    writeRepoFile(poetry, 'requirements/prod.txt', 'litestar[standard]\n')
+    writeRepoFile(poetry, 'migrations/versions/20240101_init.py', 'revision = "20240101"\ndown_revision = None\n')
+    commit(poetry, 'poetry fixture')
+    assert.deepEqual(detectCollectors(poetry), {
+        collectors: ['pymap', 'sqlmigrations', 'httproutes'],
+        stack: ['python', 'aiohttp', 'litestar', 'alembic'],
+    })
+
+    // Pipfile with Flask (the flask-restx decoy also names flask), setup.cfg only, environment.yml
+    const pipenv = makeGitRepo()
+    writeRepoFile(pipenv, 'Pipfile', '[packages]\nflask-restx = "*"\n')
+    commit(pipenv, 'pipenv fixture')
+    assert.deepEqual(detectCollectors(pipenv), { collectors: ['pymap', 'httproutes'], stack: ['python', 'flask'] })
+    const cfg = makeGitRepo()
+    writeRepoFile(cfg, 'setup.cfg', '[metadata]\nname = lib\n')
+    commit(cfg, 'setup.cfg fixture')
+    assert.deepEqual(detectCollectors(cfg), { collectors: ['pymap'], stack: ['python'] })
+    const conda = makeGitRepo()
+    writeRepoFile(conda, 'environment.yml', 'dependencies:\n  - python=3.12\n  - tornado\n')
+    commit(conda, 'conda fixture')
+    assert.deepEqual(detectCollectors(conda), { collectors: ['pymap', 'httproutes'], stack: ['python', 'tornado'] })
+
+    // plain scripts, no manifest at all
+    const scripts = makeGitRepo()
+    writeRepoFile(scripts, 'scripts/rotate_logs.py', 'import os\n')
+    commit(scripts, 'scripts fixture')
+    assert.deepEqual(detectCollectors(scripts), { collectors: ['pymap'], stack: ['python-scripts'] })
+
+    // a python-looking word inside another dependency name is not a framework hit
+    const decoy = makeGitRepo()
+    writeRepoFile(decoy, 'requirements.txt', 'pyramid-tools-x\nflasky\n') // extension names count for their framework; "flasky" is not flask
+    commit(decoy, 'decoy fixture')
+    assert.deepEqual(detectCollectors(decoy).stack, ['python', 'pyramid'])
+})
+
+test('CLI bootstrap + map: a python repo seeds pymap/httproutes/sqlmigrations and map writes all three docs', () => {
+    const repo = makeGitRepo()
+    writeRepoFile(repo, 'pyproject.toml', '[project]\nname = "svc"\ndependencies = ["fastapi", "sqlalchemy", "alembic"]\n[project.scripts]\nsvc = "svc.main:run"\n')
+    writeRepoFile(repo, 'src/svc/__init__.py', '')
+    writeRepoFile(repo, 'src/svc/main.py', 'from fastapi import FastAPI\napp = FastAPI()\n\n@app.get("/items")\ndef items():\n    return []\n\n@app.post("/items")\ndef create():\n    return {}\n')
+    writeRepoFile(repo, 'alembic/versions/0001_init.py', 'revision = "0001"\ndown_revision = None\n')
+    commit(repo, 'python service')
+    const root = path.join(makeTmpDir(), 'store')
+    const run = (args) =>
+        execFileSync('node', [KAUT, ...args], { cwd: repo, encoding: 'utf8', env: { ...process.env, KAUT_ROOT: root } })
+
+    const out = run(['bootstrap'])
+    assert.match(out, /map collectors detected: python, fastapi, alembic → pymap, sqlmigrations, httproutes/)
+    const cfg = JSON.parse(readFileSync(path.join(root, 'kaut.config.json'), 'utf8'))
+    assert.deepEqual(cfg.map.collectors, ['pymap', 'sqlmigrations', 'httproutes'])
+
+    const mapOut = run(['map'])
+    assert.match(mapOut, /1 packages, 0 scripts, 1 migrations, 2 routes \(http\)/)
+    assert.match(readFileSync(path.join(root, 'map', 'packages.md'), 'utf8'), /\| svc \| src\/svc \|/)
+    assert.match(readFileSync(path.join(root, 'map', 'routes.md'), 'utf8'), /\| POST \| \/items \| src\/svc\/main\.py:8 \|/)
+    assert.match(readFileSync(path.join(root, 'map', 'migrations.md'), 'utf8'), /\| 0001 \| init \| alembic\/versions\/0001_init\.py \|/)
 })
 
 test('detectCollectors: an empty repo detects nothing', () => {

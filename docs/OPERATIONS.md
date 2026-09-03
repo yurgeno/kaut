@@ -72,7 +72,7 @@ The project repository needs no cleanup — it was never modified.
 ## Development
 
 ```bash
-cd <engine> && node --test          # 213 tests, zero deps (node:test)
+cd <engine> && node --test          # 225 tests, zero deps (node:test)
 ```
 
 Run the bare `node --test` — do **not** pass the test directory as an argument (on Node ≥ 24
@@ -84,11 +84,11 @@ chain + config fallback) · `lib/frontmatter.mjs` (restricted-YAML subset) · `l
 `**`/`*`/`?` matcher) · `lib/stale.mjs` (anchor + verdicts) · `lib/refresh.mjs` (re-derivation
 deltas) · `lib/altitude.mjs` (coverage band) · `lib/lookup.mjs` (block renderer) ·
 `lib/journal.mjs` (telemetry) · `lib/digest.mjs` (journal aggregation) · `lib/routemap.mjs` +
-`lib/pkggraph.mjs` + `lib/composemap.mjs` (L0 adapters) · `lib/registry.mjs` (workspace
+`lib/pkggraph.mjs` + `lib/composemap.mjs` + `lib/springmap.mjs` + `lib/jvmgraph.mjs` + `lib/pymap.mjs` + `lib/nextroutes.mjs` + `lib/httproutes.mjs` + `lib/phproutes.mjs` + `lib/sqlmigrations.mjs` (L0 adapters; `lib/stackdetect.mjs` picks them at bootstrap) · `lib/registry.mjs` (workspace
 registry reader) · `lib/workspace.mjs` (workspace planning) · `lib/grants.mjs` (layered write
 gate) · `lib/drafts.mjs` (draft queue) · `lib/lock.mjs` (mkdir lock) · `lib/gitstore.mjs`
 (store git + commit chokepoint) · `lib/indexgen.mjs` (INDEX renderer + doc validation).
 
 Versioning: `VERSION` file (mirrored in `package.json`); facts record provenance as
-`<collector>@<engine-version>` (`route-map@0.8.0`, `pkg-graph@0.8.0` for the L0 maps).
+`<collector>@<engine-version>` (`route-map@0.9.0`, `pkg-graph@0.9.0`, `py-map@0.9.0`, `http-routes@0.9.0`, `sql-migrations@0.9.0` for the L0 maps).
 Data-contract changes must be additive (see [SCHEMA.md](../SCHEMA.md) preamble).
